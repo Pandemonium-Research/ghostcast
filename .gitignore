@@ -1,0 +1,13 @@
+node_modules/
+__pycache__/
+*.pyc
+
+# Projects made while trying the studio out.
+/examples/*/raw/
+/examples/*/clips/
+/examples/*/out/
+/examples/*/chrome-profile/
+/examples/*/vscode/server-data/
+/examples/*/vscode/cli-data/
+/examples/*/vscode/token
+/scratch/

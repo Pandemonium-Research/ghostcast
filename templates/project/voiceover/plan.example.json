@@ -1,0 +1,13 @@
+{
+  "_note": "Copy to plan.json once the clips are recorded. Pieces play in order; from/to are seconds in the clip (cut at pauses: studio pauses voiceover/*.m4a); each starts at its take (and segment) plus offset, or after the previous piece.",
+  "pieces": [
+    { "clip": "A1.m4a", "from": 0.4, "to": 3.6, "take": "title", "offset": 0.3,
+      "text": "This is a sample project, recorded without a screen." },
+    { "clip": "A2.m4a", "from": 0.5, "to": 4.1, "take": "terminal", "segment": "terminal_list", "offset": 0.2,
+      "text": "A terminal take opens VS Code on a folder, types each command,", "spill": 1.0 },
+    { "clip": "A2.m4a", "from": 4.1, "to": 6.2, "take": "terminal", "segment": "terminal_count", "offset": 0.8,
+      "text": "and zooms in on the answer." },
+    { "clip": "A3.m4a", "from": 0.3, "to": 5.0, "take": "web", "offset": 0.3,
+      "text": "A web take moves a drawn cursor, scrolls, and marks what to look at." }
+  ]
+}

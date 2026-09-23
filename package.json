@@ -1,0 +1,32 @@
+{
+  "name": "agent-screencast",
+  "version": "0.1.0",
+  "description": "A recording studio for coding agents: scripted, headless screencasts of real terminals, editors and web pages — cut, zoomed, captioned and voiced.",
+  "type": "module",
+  "bin": {
+    "studio": "bin/studio.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "py/*.py",
+    "templates/",
+    "docs/",
+    "SKILL.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0"
+  },
+  "keywords": [
+    "screencast",
+    "demo-video",
+    "playwright",
+    "vscode",
+    "terminal",
+    "agent",
+    "ffmpeg"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "items": [
+    { "take": "title" },
+    {
+      "take": "terminal",
+      "captions": [
+        { "text": "real commands, typed at a human pace", "from": "terminal_list", "at": 0.3 },
+        { "text": "the zoom follows the line that matters", "from": "terminal_count", "at": 1.2 }
+      ]
+    },
+    {
+      "take": "web",
+      "captions": [{ "text": "a web page, driven with a visible cursor", "from": "web_hero", "at": 0.4 }]
+    }
+  ],
+  "narration": [
+    { "takes": ["title"], "text": "This is a sample project, recorded without a screen." },
+    { "takes": ["terminal"], "text": "A terminal take opens VS Code on a folder, types each command, and zooms in on the answer." },
+    { "takes": ["web"], "text": "A web take moves a drawn cursor, scrolls, and marks what to look at." }
+  ]
+}

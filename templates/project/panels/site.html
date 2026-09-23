@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- A stand-in web page for the sample web take. Point that scene at a real site instead: the helpers
+     work the same on any page. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sample site</title>
+<style>
+  :root { --bg: #ffffff; --ink: #18181b; --muted: #52525b; --line: #e4e4e7; --accent: #2563eb; --code: #f4f4f5; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 20px/1.6 "Segoe UI", system-ui, -apple-system, Arial, sans-serif; }
+  nav { display: flex; align-items: center; gap: 36px; padding: 22px 64px; border-bottom: 1px solid var(--line); }
+  nav b { font-size: 24px; margin-right: auto; }
+  nav a { color: var(--muted); text-decoration: none; }
+  .hero { padding: 120px 64px 96px; max-width: 1200px; }
+  .hero h1 { font-size: 76px; line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 24px; }
+  .hero p { font-size: 28px; color: var(--muted); max-width: 900px; margin: 0 0 40px; }
+  .btn { display: inline-block; background: var(--accent); color: #fff; padding: 16px 30px; border-radius: 10px; font-weight: 600; text-decoration: none; }
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; padding: 0 64px 96px; }
+  .card { border: 1px solid var(--line); border-radius: 14px; padding: 28px; }
+  .card h3 { margin: 0 0 8px; font-size: 24px; }
+  .card p { margin: 0; color: var(--muted); }
+  #install { padding: 0 64px 160px; }
+  #install h2 { font-size: 40px; margin: 0 0 20px; }
+  pre { background: var(--code); border-radius: 12px; padding: 24px 28px; font: 24px ui-monospace, "Cascadia Mono", Consolas, monospace; margin: 0; max-width: 900px; }
+  .row { display: inline-flex; align-items: center; gap: 20px; }
+  .copy { font-family: inherit; font-size: 20px; font-weight: 600; padding: 14px 22px; border-radius: 10px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+<nav><b>sample</b><a href="#features">Features</a><a href="#install">Install</a><a href="#install">Docs</a></nav>
+<section class="hero">
+  <h1>A tool worth a two-minute demo</h1>
+  <p>Replace this page with the real site. The take moves a drawn cursor, scrolls, marks, and clicks with real events.</p>
+  <a class="btn" href="#install">Get started</a>
+</section>
+<section class="features" id="features">
+  <div class="card"><h3>Scripted</h3><p>Every take is a scene file, so a retake is one command.</p></div>
+  <div class="card"><h3>Headless</h3><p>Nothing on your screen is recorded; nothing on it gets in the way.</p></div>
+  <div class="card"><h3>Honest</h3><p>Sped-up stretches are tagged, and every command really runs.</p></div>
+</section>
+<section id="install">
+  <h2>Install</h2>
+  <div class="row"><pre>npm install -g sample-tool</pre><button class="copy" onclick="this.textContent='Copied'">Copy</button></div>
+</section>
+</body>
+</html>
