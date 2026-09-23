@@ -13,8 +13,9 @@ nothing on your screen is recorded and nothing on it gets in the way. Post-produ
 deterministic: a retake is one command, and the edit is data (`timeline.json`,
 `voiceover/plan.json`), not a timeline in a video editor.
 
-It was built while recording a 2½-minute systems-demo video for a paper submission, and
-generalised afterwards. [`docs/gotchas.md`](docs/gotchas.md) records what that took.
+Recording real tools without a screen has sharp edges: frames that stop arriving, keystrokes
+that vanish, terminals that ignore synthetic input. ghostcast handles them, and
+[`docs/gotchas.md`](docs/gotchas.md) explains each one.
 
 ```
 scene.mjs ──record──▶ raw/<take>/ frames + event log
@@ -37,7 +38,8 @@ with Playwright and narrate it with **TTS**. This one is for demos those tools d
 - **A human voice.** The narrator reads a generated script that says whether each block fits
   its time. Their clips are split at detected pauses, each piece is anchored to the beat it
   describes, and the mix is normalised for broadcast loudness.
-- **Submission constraints.** A length cap is checked on every assemble. A cue sheet gives
+- **Delivery constraints** (conference submissions, launch posts, docs). A length cap is
+  checked on every assemble. A cue sheet gives
   every segment's start. Every sped-up stretch is tagged on screen automatically.
 - **Agents review their own footage.** Contact sheets and stills are PNGs an agent can look at,
   and a failed take leaves a screenshot of where it stopped.

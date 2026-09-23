@@ -1,8 +1,8 @@
 # Gotchas
 
-Everything here went wrong at least once while recording a real demo, a 2½-minute systems-paper
-video of a CLI, VS Code and two agent CLIs. ghostcast handles most of it already. This is what
-to check when something misbehaves anyway.
+Recording real software headlessly has sharp edges. ghostcast handles the ones below already;
+this page says what each looks like, so you can tell when something slips through, and what to
+check first.
 
 ## Headless capture
 
@@ -51,7 +51,7 @@ to check when something misbehaves anyway.
 - **Focus lands a beat late.** After the palette closes, or after a click into the terminal,
   xterm takes focus a few hundred ms later, and a key sent sooner is dropped. `focusTerminal`
   waits for the helper textarea to have focus. `h.run` also sends the first character alone and
-  confirms it on screen (the "first-key drop" once turned `skillpm` into `killpm`).
+  confirms it on screen (without that, `npm test` can arrive as `pm test`).
 - **xterm ignores synthetic key events.** All typing goes through Playwright's keyboard.
 - **Layout is remembered between takes.** Panel size, side bars and maximized state persist in
   the profile. `vscode.open` normalises them; if you change the layout mid-take, restore it
