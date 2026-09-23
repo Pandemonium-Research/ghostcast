@@ -1,9 +1,9 @@
 """Lay the voice-over onto the silent cut and write the finished video.
 
-    studio vo-mix [--plan voiceover/plan.json]
+    ghostcast vo-mix [--plan voiceover/plan.json]
 
 The plan lists pieces in playback order: a stretch of a recorded clip ([from, to] seconds in the
-clip, ideally cut at pauses — see `studio pauses`) and the beat it belongs to (take, optional
+clip, ideally cut at pauses — see `ghostcast pauses`) and the beat it belongs to (take, optional
 segment, offset in seconds):
 
   {"pieces": [
@@ -34,7 +34,7 @@ def main():
     plan = json.loads((ROOT / arg("--plan", "voiceover/plan.json")).read_text(encoding="utf-8"))
     silent = ROOT / "out" / f"{NAME}-silent.mp4"
     if not silent.exists():
-        sys.exit(f"no out/{silent.name} (run: studio assemble)")
+        sys.exit(f"no out/{silent.name} (run: ghostcast assemble)")
     starts, total = take_starts()
     missing = [i["take"] for i in timeline()["items"] if i["take"] not in starts]
     if missing:

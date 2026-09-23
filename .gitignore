@@ -2,7 +2,7 @@ node_modules/
 __pycache__/
 *.pyc
 
-# Projects made while trying the studio out.
+# Projects made while trying ghostcast out.
 /examples/*/raw/
 /examples/*/clips/
 /examples/*/out/

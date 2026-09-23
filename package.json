@@ -1,10 +1,10 @@
 {
-  "name": "agent-screencast",
+  "name": "ghostcast",
   "version": "0.1.0",
   "description": "A recording studio for coding agents: scripted, headless screencasts of real terminals, editors and web pages — cut, zoomed, captioned and voiced.",
   "type": "module",
   "bin": {
-    "studio": "bin/studio.mjs"
+    "ghostcast": "bin/ghostcast.mjs"
   },
   "files": [
     "bin/",
@@ -28,5 +28,6 @@
     "terminal",
     "agent",
     "ffmpeg"
-  ]
+  ],
+  "license": "MIT"
 }

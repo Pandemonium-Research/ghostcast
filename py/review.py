@@ -1,10 +1,10 @@
 """Look at what was recorded: contact sheets and stills, as images an agent (or a person) can read.
 
-    studio review <take>              contact sheet of clips/<take>.mp4, labelled by segment
-    studio review final               contact sheet of the finished video (or the silent cut)
-    studio review <take> --raw        contact sheet of the raw capture, ending on its last frame;
+    ghostcast review <take>              contact sheet of clips/<take>.mp4, labelled by segment
+    ghostcast review final               contact sheet of the finished video (or the silent cut)
+    ghostcast review <take> --raw        contact sheet of the raw capture, ending on its last frame;
                                       for a take that failed, this shows where it stopped
-    studio review <take> --at 12.5    one full-size still at 12.5 s (repeat --at for more)
+    ghostcast review <take> --at 12.5    one full-size still at 12.5 s (repeat --at for more)
     options: --every 2 (seconds between thumbnails; default: about 16 per sheet)
 
 Writes PNGs under out/review/ and prints their paths. Check every take before assembling: text

@@ -1,6 +1,6 @@
 """Find the pauses in voice-over clips: where speech starts and ends, and where a clip can be cut.
 
-    studio pauses voiceover/A1.m4a [voiceover/A2.m4a ...] [--noise -30] [--min 0.15]
+    ghostcast pauses voiceover/A1.m4a [voiceover/A2.m4a ...] [--noise -30] [--min 0.15]
 
 A recorded block is usually laid as several pieces, each anchored to the beat it describes (see
 vo_mix.py). Pieces must be cut in silence, between sentences; this lists the silences (ffmpeg

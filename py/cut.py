@@ -1,6 +1,6 @@
 """Turn a raw take into a finished clip: keep the logged segments, zoom where the scene focused.
 
-    studio cut <take> [<take> ...]
+    ghostcast cut <take> [<take> ...]
 
 Reads raw/<take>/frames.json, frames/*.jpg and log.json (written by the recorder) and writes
 clips/<take>.mp4 at the project's output size and frame rate, plus clips/<take>.json giving each

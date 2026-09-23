@@ -1,7 +1,7 @@
 # Gotchas
 
 Everything here went wrong at least once while recording a real demo, a 2½-minute systems-paper
-video of a CLI, VS Code and two agent CLIs. The studio handles most of it already. This is what
+video of a CLI, VS Code and two agent CLIs. ghostcast handles most of it already. This is what
 to check when something misbehaves anyway.
 
 ## Headless capture
@@ -40,7 +40,7 @@ to check when something misbehaves anyway.
   `terminal.integrated.gpuAcceleration: "off"`, which the template does. With the canvas or
   WebGL renderer the rows are empty, and `h.run` never sees its prompt.
 - **User settings live in the browser, not on disk.** The web workbench keeps user settings in
-  IndexedDB. `studio vscode` therefore writes the project's settings at *machine* scope
+  IndexedDB. `ghostcast vscode` therefore writes the project's settings at *machine* scope
   (`server-data/data/Machine/settings.json`), which the workbench does read.
 - **Workspace trust.** A new browser profile asks once. `vscode.open` clicks *Trust Folder &
   Continue*, and the project's persistent profile (`chrome-profile/`) remembers the answer.
@@ -60,7 +60,7 @@ to check when something misbehaves anyway.
   `.monaco-editor` containers by their on-screen position.
 - **The first load sometimes fails.** This happens when takes run back to back, and on a
   server's very first start, while it is still unpacking. `vscode.open` reloads once, and
-  `studio all` retries a failed take once.
+  `ghostcast all` retries a failed take once.
 - **Windows paths.** serve-web expects `folder=/c:/Users/…`; `vscode.open` converts. The
   terminal profile is Git Bash with `--rcfile vscode/shell.bashrc`.
 
@@ -109,7 +109,7 @@ to check when something misbehaves anyway.
   normalises in two passes.
 - **Use `-t`, not `-shortest`.** `-shortest` can end the video at the audio's last packet.
 - **Split at pauses, anchor to beats.** One recorded block rarely lines up with the picture as a
-  whole. Cut it at sentence pauses (`studio pauses`) and anchor each piece to its segment.
+  whole. Cut it at sentence pauses (`ghostcast pauses`) and anchor each piece to its segment.
   Reordering sentences to match the picture is fine; changing what they say is not.
 - **Ask which clip is which** when file names don't say. Narrators record out of order.
 
@@ -119,6 +119,6 @@ to check when something misbehaves anyway.
   heredocs, which silently corrupts regexes and Windows paths. Write files containing
   backslashes with a file-editing tool, not `cat <<EOF`.
 - **Don't edit a bash script while it runs.** Bash reads a script as it executes it, so an edit
-  shifts what runs next. `studio all` is Node and safe; your own batch scripts may not be.
+  shifts what runs next. `ghostcast all` is Node and safe; your own batch scripts may not be.
 - **A failed take leaves partial frames in `raw/`.** Never cut them as if they were new.
-  `studio all` does not; if you script your own batch, check the exit code first.
+  `ghostcast all` does not; if you script your own batch, check the exit code first.

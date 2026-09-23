@@ -8,8 +8,8 @@ export async function setup(h) {
   // blank page waiting for it.
   await h.goto(h.fileUrl('panels/card.html', {
     title: 'Sample project',
-    sub: 'Recorded headlessly, cut, captioned and voiced by agent-screencast',
-    foot: 'studio init my-demo',
+    sub: 'Recorded headlessly, cut, captioned and voiced by ghostcast',
+    foot: 'ghostcast init my-demo',
     hold: 1,
   }), { cursor: false });
 }

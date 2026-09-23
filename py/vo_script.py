@@ -1,6 +1,6 @@
 """Write the voice-over script: each narration block, when it starts in the cut, and whether it fits.
 
-    studio vo-script
+    ghostcast vo-script
 
 Narration lives in timeline.json, next to the takes it is spoken over:
 

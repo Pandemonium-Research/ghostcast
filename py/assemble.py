@@ -1,6 +1,6 @@
 """Assemble finished clips into the silent cut, with captions, and write the cue sheet.
 
-    studio assemble
+    ghostcast assemble
 
 Reads timeline.json at the project root:
 
@@ -118,7 +118,7 @@ def main():
         cues += [r[2] for r in sorted(rows)]
         t += meta["duration"]
     if not parts:
-        sys.exit("nothing to assemble: no take in timeline.json has a clip (run: studio cut <take>)")
+        sys.exit("nothing to assemble: no take in timeline.json has a clip (run: ghostcast cut <take>)")
     listing = tmp / "concat.txt"
     listing.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts))
     out = ROOT / "out" / f"{NAME}-silent.mp4"

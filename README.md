@@ -1,11 +1,14 @@
-# agent-screencast
+# ghostcast
+
+*Screencasts with nobody at the keyboard.* A ghost types, clicks and scrolls in an off-screen
+browser while your agent directs.
 
 A recording studio for coding agents. Scripted, headless screencasts of **real** terminals,
 editors and web pages. They are cut to the beats, eased into zooms, captioned, tagged wherever
 time is sped up, and laid with a human voice-over.
 
 An agent writes a scene per shot: open VS Code on a project, type a command, zoom onto the line
-that answers it. `studio` then plays the scene in an off-screen Chrome and keeps every frame, so
+that answers it. `ghostcast` then plays the scene in an off-screen Chrome and keeps every frame, so
 nothing on your screen is recorded and nothing on it gets in the way. Post-production is
 deterministic: a retake is one command, and the edit is data (`timeline.json`,
 `voiceover/plan.json`), not a timeline in a video editor.
@@ -50,20 +53,20 @@ Requirements:
 - On Windows, Git Bash.
 
 ```bash
-git clone <this repo> agent-screencast && cd agent-screencast
+git clone <this repo> ghostcast && cd ghostcast
 npm install                       # Playwright only; it uses your installed Chrome
-node bin/studio.mjs doctor
-node bin/studio.mjs init ../my-demo && cd ../my-demo
+node bin/ghostcast.mjs doctor
+node bin/ghostcast.mjs init ../my-demo && cd ../my-demo
 
 # Terminal/editor takes need VS Code served (read the license first; this flag accepts it):
-node ../agent-screencast/bin/studio.mjs vscode --accept-server-license-terms &
+node ../ghostcast/bin/ghostcast.mjs vscode --accept-server-license-terms &
 
-node ../agent-screencast/bin/studio.mjs all          # record + cut every take, then assemble
-node ../agent-screencast/bin/studio.mjs review final # contact sheet in out/review/final.png
+node ../ghostcast/bin/ghostcast.mjs all          # record + cut every take, then assemble
+node ../ghostcast/bin/ghostcast.mjs review final # contact sheet in out/review/final.png
 ```
 
 The template records a title card, a terminal take and a web take (about 30 s). For convenience,
-`npm link` puts `studio` on your `PATH`.
+`npm link` puts `ghostcast` on your `PATH`.
 
 **For agents:** load [`SKILL.md`](SKILL.md). It has the workflow and the rules (honest timing,
 nothing faked, no personal data, ask before costly or outward-facing steps). The helpers are in
@@ -73,17 +76,17 @@ nothing faked, no personal data, ask before costly or outward-facing steps). The
 
 | | |
 |---|---|
-| `studio init <dir>` | New project from the template |
-| `studio doctor` | Check the toolchain |
-| `studio vscode [--port]` | Serve VS Code for the project, with its settings and clean shell |
-| `studio record <take> [--headed]` | Run a scene and capture it |
-| `studio cut <take…>` | Frames → clip: segments, speed, zoom |
-| `studio all [take…]` | Record + cut (one retry per take), then assemble |
-| `studio assemble` | Clips + captions → silent cut + cue sheet |
-| `studio review <take\|final> [--raw] [--at s]` | Contact sheets and stills |
-| `studio vo-script` | Narration timed against the cut, with fit warnings |
-| `studio pauses <audio…>` | Where to split voice-over clips |
-| `studio vo-mix` | Lay the voice-over → final video + placement report |
+| `ghostcast init <dir>` | New project from the template |
+| `ghostcast doctor` | Check the toolchain |
+| `ghostcast vscode [--port]` | Serve VS Code for the project, with its settings and clean shell |
+| `ghostcast record <take> [--headed]` | Run a scene and capture it |
+| `ghostcast cut <take…>` | Frames → clip: segments, speed, zoom |
+| `ghostcast all [take…]` | Record + cut (one retry per take), then assemble |
+| `ghostcast assemble` | Clips + captions → silent cut + cue sheet |
+| `ghostcast review <take\|final> [--raw] [--at s]` | Contact sheets and stills |
+| `ghostcast vo-script` | Narration timed against the cut, with fit warnings |
+| `ghostcast pauses <audio…>` | Where to split voice-over clips |
+| `ghostcast vo-mix` | Lay the voice-over → final video + placement report |
 
 ## A scene
 
@@ -108,6 +111,10 @@ export default async function (h) {
 
 Version 0.1, tested on Windows 11 with Chrome, VS Code 1.138, ffmpeg 8 and Python 3.14. The code
 paths for macOS and Linux exist (Chrome channel, bash profile, fonts) but are untested.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ## Related tools
 

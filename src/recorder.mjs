@@ -25,7 +25,7 @@ const jitter = (ms) => ms * (0.55 + Math.random() * 0.9);
 export function loadProject(dir) {
   const root = path.resolve(dir);
   const file = path.join(root, 'project.json');
-  if (!fs.existsSync(file)) throw new Error(`no project.json in ${root} (run: studio init <dir>)`);
+  if (!fs.existsSync(file)) throw new Error(`no project.json in ${root} (run: ghostcast init <dir>)`);
   return { root, config: JSON.parse(fs.readFileSync(file, 'utf8')) };
 }
 
@@ -228,7 +228,7 @@ export function makeHelpers(project, page, log) {
   return h;
 }
 
-// ---- VS Code in the browser (`code serve-web`; see `studio vscode`) ----
+// ---- VS Code in the browser (`code serve-web`; see `ghostcast vscode`) ----
 function vscodeHelpers(h) {
   const { page } = h;
   const cfg = h.config.vscode || {};
@@ -252,7 +252,7 @@ function vscodeHelpers(h) {
     // terminal gets the full width; maximize:true (default) gives the panel the whole window.
     async open(folder, { sidebar = true, maximize = true } = {}) {
       const tokenFile = path.resolve(h.project.root, cfg.tokenFile || 'vscode/token');
-      if (!fs.existsSync(tokenFile)) throw new Error(`no ${tokenFile}: start VS Code first (studio vscode)`);
+      if (!fs.existsSync(tokenFile)) throw new Error(`no ${tokenFile}: start VS Code first (ghostcast vscode)`);
       const token = fs.readFileSync(tokenFile, 'utf8').trim();
       // serve-web takes a Windows folder as /c:/Users/…
       const abs = path.resolve(h.project.root, folder).replace(/\\/g, '/');

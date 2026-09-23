@@ -1,6 +1,6 @@
 """Shared by the post-production scripts: the project, its config, and a few helpers.
 
-The project is the directory in STUDIO_PROJECT (set by `studio`), or the current directory.
+The project is the directory in GHOSTCAST_PROJECT (set by `ghostcast`), or the current directory.
 """
 import json
 import os
@@ -8,9 +8,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(os.environ.get("STUDIO_PROJECT") or os.getcwd()).resolve()
+ROOT = Path(os.environ.get("GHOSTCAST_PROJECT") or os.getcwd()).resolve()
 if not (ROOT / "project.json").exists():
-    sys.exit(f"no project.json in {ROOT} (run: studio init <dir>)")
+    sys.exit(f"no project.json in {ROOT} (run: ghostcast init <dir>)")
 CFG = json.loads((ROOT / "project.json").read_text(encoding="utf-8"))
 NAME = CFG.get("name", "screencast")
 

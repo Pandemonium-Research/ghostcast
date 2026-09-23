@@ -1,5 +1,5 @@
 {
-  "_note": "Copy to plan.json once the clips are recorded. Pieces play in order; from/to are seconds in the clip (cut at pauses: studio pauses voiceover/*.m4a); each starts at its take (and segment) plus offset, or after the previous piece.",
+  "_note": "Copy to plan.json once the clips are recorded. Pieces play in order; from/to are seconds in the clip (cut at pauses: ghostcast pauses voiceover/*.m4a); each starts at its take (and segment) plus offset, or after the previous piece.",
   "pieces": [
     { "clip": "A1.m4a", "from": 0.4, "to": 3.6, "take": "title", "offset": 0.3,
       "text": "This is a sample project, recorded without a screen." },

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// studio: record, cut, caption and voice a screencast from scripted scenes.
-// Run `studio help` for the commands; SKILL.md has the workflow.
+// ghostcast: record, cut, caption and voice a screencast from scripted scenes.
+// Run `ghostcast help` for the commands; SKILL.md has the workflow.
 import { spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -12,24 +12,24 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = path.resolve(HERE, '..');
 const PY = path.join(PKG, 'py');
 
-const HELP = `studio — a recording studio for coding agents
+const HELP = `ghostcast — a recording studio for coding agents
 
-  studio init <dir>              new project from the template
-  studio doctor                  check Chrome, ffmpeg, Python + Pillow, VS Code
-  studio vscode [--port 8765] --accept-server-license-terms
-                                 serve VS Code in the browser for terminal/editor scenes
-                                 (runs until stopped; start it in the background)
+  ghostcast init <dir>                  new project from the template
+  ghostcast doctor                      check Chrome, ffmpeg, Python + Pillow, VS Code
+  ghostcast vscode [--port 8765] --accept-server-license-terms
+                                        serve VS Code in the browser for terminal/editor scenes
+                                        (runs until stopped; start it in the background)
 
-  studio record <take> [--headed]   run the take's scene and capture it to raw/<take>/
-  studio cut <take> [...]           raw/<take>/ → clips/<take>.mp4 (segments, speed, zoom)
-  studio all [<take> ...]           record + cut each take (one retry), then assemble
-  studio assemble                   clips + captions → out/<name>-silent.mp4 + cue sheet
-  studio review <take|final> [--raw] [--at <s>] [--every <s>]
-                                    contact sheets and stills under out/review/
+  ghostcast record <take> [--headed]    run the take's scene and capture it to raw/<take>/
+  ghostcast cut <take> [...]            raw/<take>/ → clips/<take>.mp4 (segments, speed, zoom)
+  ghostcast all [<take> ...]            record + cut each take (one retry), then assemble
+  ghostcast assemble                    clips + captions → out/<name>-silent.mp4 + cue sheet
+  ghostcast review <take|final> [--raw] [--at <s>] [--every <s>]
+                                        contact sheets and stills under out/review/
 
-  studio vo-script                  narration blocks timed against the cut → out/voiceover-script.md
-  studio pauses <audio> [...]       silences in voice-over clips: where to cut them into pieces
-  studio vo-mix [--plan <file>]     lay the voice-over → out/<name>.mp4 + placement report
+  ghostcast vo-script                   narration blocks timed against the cut → out/voiceover-script.md
+  ghostcast pauses <audio> [...]        silences in voice-over clips: where to cut them into pieces
+  ghostcast vo-mix [--plan <file>]      lay the voice-over → out/<name>.mp4 + placement report
 
 Options: --project <dir> (default: the current directory).`;
 
@@ -42,16 +42,16 @@ const projectDir = path.resolve(opt('--project', process.cwd()));
 const cmd = argv.shift();
 
 function python() {
-  if (process.env.STUDIO_PYTHON) return process.env.STUDIO_PYTHON;
+  if (process.env.GHOSTCAST_PYTHON) return process.env.GHOSTCAST_PYTHON;
   for (const p of process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python']) {
     if (spawnSync(p, ['--version'], { stdio: 'ignore' }).status === 0) return p;
   }
-  die('no Python found (set STUDIO_PYTHON)');
+  die('no Python found (set GHOSTCAST_PYTHON)');
 }
 
 function py(script, args) {
   const r = spawnSync(python(), [path.join(PY, script), ...args], {
-    stdio: 'inherit', env: { ...process.env, STUDIO_PROJECT: projectDir, PYTHONUTF8: '1' },
+    stdio: 'inherit', env: { ...process.env, GHOSTCAST_PROJECT: projectDir, PYTHONUTF8: '1' },
   });
   return r.status ?? 1;
 }
@@ -117,8 +117,8 @@ function writeMachineSettings(dataDir) {
     const bash = process.platform === 'win32' ? gitBash() : '/bin/bash';
     if (!bash) console.warn('warning: Git Bash not found; the terminal will use the default shell and not shell.bashrc');
     else if (!settings[`terminal.integrated.defaultProfile.${key}`]) {
-      settings[`terminal.integrated.profiles.${key}`] = { 'Studio Bash': { path: bash, args: ['--rcfile', rc, '-i'] } };
-      settings[`terminal.integrated.defaultProfile.${key}`] = 'Studio Bash';
+      settings[`terminal.integrated.profiles.${key}`] = { 'Ghostcast Bash': { path: bash, args: ['--rcfile', rc, '-i'] } };
+      settings[`terminal.integrated.defaultProfile.${key}`] = 'Ghostcast Bash';
     }
   }
   const dir = path.join(dataDir, 'data', 'Machine');
@@ -130,12 +130,12 @@ const commands = {
   help() { console.log(HELP); },
 
   init() {
-    const dir = argv[0] ? path.resolve(argv[0]) : die('usage: studio init <dir>');
+    const dir = argv[0] ? path.resolve(argv[0]) : die('usage: ghostcast init <dir>');
     copyDir(path.join(PKG, 'templates', 'project'), dir);
     const pj = path.join(dir, 'project.json');
     const cfg = JSON.parse(fs.readFileSync(pj, 'utf8'));
     if (cfg.name === 'screencast') { cfg.name = path.basename(dir).toLowerCase().replace(/[^a-z0-9-]+/g, '-'); fs.writeFileSync(pj, JSON.stringify(cfg, null, 2) + '\n'); }
-    console.log(`project at ${dir}\nnext: edit timeline.json and scenes/, then \`studio record <take>\` from there (or pass --project).`);
+    console.log(`project at ${dir}\nnext: edit timeline.json and scenes/, then \`ghostcast record <take>\` from there (or pass --project).`);
   },
 
   doctor() {
@@ -144,7 +144,7 @@ const commands = {
     check('node >= 18', Number(process.versions.node.split('.')[0]) >= 18 && process.version, 'install Node 18+');
     let pw = null;
     try { pw = JSON.parse(fs.readFileSync(path.join(PKG, 'node_modules', 'playwright', 'package.json'), 'utf8')).version; } catch {}
-    check('playwright', pw, 'npm install (in the studio package)');
+    check('playwright', pw, 'npm install (in the ghostcast package)');
     const chrome = {
       win32: ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'Application', 'chrome.exe')],
       darwin: ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'],
@@ -184,12 +184,12 @@ const commands = {
 
   async record() {
     const headed = flag('--headed');
-    const take = argv[0] || die('usage: studio record <take> [--headed]');
+    const take = argv[0] || die('usage: ghostcast record <take> [--headed]');
     const ok = await record(take, headed).catch((e) => { console.error(e.stack || e.message); return false; });
     process.exit(ok ? 0 : 1);
   },
 
-  cut() { process.exit(argv.length ? py('cut.py', argv) : die('usage: studio cut <take> [...]')); },
+  cut() { process.exit(argv.length ? py('cut.py', argv) : die('usage: ghostcast cut <take> [...]')); },
   assemble() { process.exit(py('assemble.py', argv)); },
   review() { process.exit(py('review.py', argv)); },
   'vo-script'() { process.exit(py('vo_script.py', argv)); },
@@ -208,7 +208,7 @@ const commands = {
         if (!ok) console.log(`${take}: take failed (attempt ${attempt})`);
       }
       // A failed take leaves partial footage in raw/; it is never cut as if it were a good one.
-      if (ok) { if (py('cut.py', [take]) !== 0) failed.push(take); } else { console.log(`${take}: NOT CUT (failed twice); see \`studio review ${take} --raw\``); failed.push(take); }
+      if (ok) { if (py('cut.py', [take]) !== 0) failed.push(take); } else { console.log(`${take}: NOT CUT (failed twice); see \`ghostcast review ${take} --raw\``); failed.push(take); }
     }
     const code = py('assemble.py', []);
     if (failed.length) die(`failed: ${failed.join(', ')}`);

@@ -1,4 +1,4 @@
-# The recording terminal's shell. `studio vscode` points VS Code's terminal at this file (bash
+# The recording terminal's shell. `ghostcast vscode` points VS Code's terminal at this file (bash
 # --rcfile), so nothing personal loads: no ~/.bashrc, no history, no custom prompt, no aliases.
 unset PROMPT_COMMAND
 export HISTFILE=/dev/null

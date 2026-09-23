@@ -1,4 +1,4 @@
-// Terminal take: VS Code in the browser (start it first: studio vscode --accept-server-license-terms),
+// Terminal take: VS Code in the browser (start it first: ghostcast vscode --accept-server-license-terms),
 // opened on the project's workspace/ folder, with a clean shell (vscode/shell.bashrc).
 //
 // h.run types a command at a human pace, checks it reached the terminal, presses Enter, and waits

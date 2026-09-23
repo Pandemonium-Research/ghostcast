@@ -1,9 +1,9 @@
 ---
-name: agent-screencast
+name: ghostcast
 description: Make a demo video or screencast of real software — terminal commands, VS Code, agent CLIs, web pages — recorded headlessly from scripted scenes, then cut, zoomed, captioned, speed-tagged and laid with a human voice-over. Use when asked to record a demo, screencast, walkthrough or submission video.
 ---
 
-# agent-screencast
+# ghostcast
 
 A recording studio you drive from files. Each shot is a **scene** (a small ES module) that
 Chrome plays off screen while every frame is kept. Post-production turns the frames into clips.
@@ -12,7 +12,7 @@ adds captions, and lays the narrator's recorded clips on their beats.
 
 Nothing on the user's screen is recorded, and nothing on it gets in the way.
 
-The `studio` command is `node <this package>/bin/studio.mjs`. Run it from the project directory,
+The `ghostcast` command is `node <this package>/bin/ghostcast.mjs`. Run it from the project directory,
 or pass `--project <dir>`.
 
 ## Before anything: agree the script
@@ -29,12 +29,12 @@ building anything. Then map it:
 ## Workflow
 
 1. **Set up.**
-   - `npm install` in this package, then `studio doctor`. It checks Chrome, ffmpeg, Python and
+   - `npm install` in this package, then `ghostcast doctor`. It checks Chrome, ffmpeg, Python and
      Pillow, and the VS Code CLI.
-   - `studio init <dir>` makes a project from the template: three sample takes (title card,
+   - `ghostcast init <dir>` makes a project from the template: three sample takes (title card,
      terminal, web page) you can record straight away to check the machine.
    - For terminal or editor takes, VS Code must be served:
-     `studio vscode --accept-server-license-terms`. Run it in the background. **Ask the user
+     `ghostcast vscode --accept-server-license-terms`. Run it in the background. **Ask the user
      before passing that flag.** It accepts the VS Code Server license on their behalf.
 2. **Prepare the world the demo happens in.**
    - Use real projects with real names, in ordinary places. Don't use `demo/` or `test123`.
@@ -47,27 +47,27 @@ building anything. Then map it:
 3. **Write a scene per take** in `scenes/<take>.mjs`. See `docs/scene-api.md` for the helpers,
    and the template's scenes for the patterns.
 4. **Record, then look.**
-   - Run `studio record <take>`, then `studio cut <take>`, then `studio review <take>`.
+   - Run `ghostcast record <take>`, then `ghostcast cut <take>`, then `ghostcast review <take>`.
    - **Open the contact sheet PNG and look at it.** Is the text legible at the zoom? Is the
      right line in focus? Is anything stuck, cut off, or personal?
-   - Use `studio review <take> --at <s>` for a full-size still.
+   - Use `ghostcast review <take> --at <s>` for a full-size still.
    - When a take fails, the recorder saves `raw/<take>/failed.png` (or `setup-failed.png`).
-     `studio review <take> --raw` shows how far it got.
+     `ghostcast review <take> --raw` shows how far it got.
 5. **Assemble.**
-   - Add captions to `timeline.json`, then run `studio all`, or `studio assemble` if the clips
+   - Add captions to `timeline.json`, then run `ghostcast all`, or `ghostcast assemble` if the clips
      are current.
-   - Check `out/<name>.cues.md` and `studio review final`.
+   - Check `out/<name>.cues.md` and `ghostcast review final`.
    - Keep to the user's length cap (`output.capSeconds`). To shorten, speed up waits
      (`@fitN`), trim holds (`trims`), or cut beats. Never raise the cap on your own.
 6. **Voice-over.** The user records it; you place it.
-   - `studio vo-script` writes `out/voiceover-script.md`: each block, where it starts, and
+   - `ghostcast vo-script` writes `out/voiceover-script.md`: each block, where it starts, and
      whether it fits. Fix any "too long" first. Then give the user the file to read from.
    - The user puts the clips in `voiceover/`. Ask which clip is which block if the names don't
      say. Don't guess, and don't transcribe their voice with a cloud service.
-   - `studio pauses voiceover/*` lists each clip's pauses. Split the clips at sentence pauses
+   - `ghostcast pauses voiceover/*` lists each clip's pauses. Split the clips at sentence pauses
      into pieces, and anchor each piece to the beat it describes in `voiceover/plan.json`
      (template: `plan.example.json`).
-   - Run `studio vo-mix` and read the placement report. Fix every item under "Problems".
+   - Run `ghostcast vo-mix` and read the placement report. Fix every item under "Problems".
 
 ## Rules
 
@@ -75,7 +75,7 @@ building anything. Then map it:
   If something on screen is staged (a prepared repo, a seeded database), the narration or a
   caption says so. The video must hold up if a reviewer runs the same commands.
 - **Show time honestly.**
-  - Speed up only through segment names (`@4x`, `@fitN`). The studio then tags those stretches
+  - Speed up only through segment names (`@4x`, `@fitN`). ghostcast then tags those stretches
     `N×` on screen.
   - Cutting dead air between segments is fine. Cutting a failure so that a retry looks like a
     first success is not.
@@ -88,7 +88,7 @@ building anything. Then map it:
   - pushing, publishing, or uploading the video.
 - **Never record the user's real screen or windows.** Everything is captured from the
   headless browser.
-- A failed take is never cut. `studio all` retries once, then reports it.
+- A failed take is never cut. `ghostcast all` retries once, then reports it.
 
 ## Files
 
