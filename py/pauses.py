@@ -23,14 +23,18 @@ def pauses(path, noise, min_len):
     starts = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", err)]
     ends = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", err)]
     spans = list(zip(starts, ends + [total] * (len(starts) - len(ends))))
-    # A click or breath can split one pause in two; join silences that nearly touch.
+    return total, merge(spans)
+
+
+def merge(spans, gap=0.08):
+    """A click or breath can split one pause in two: join silences less than `gap` seconds apart."""
     merged = []
     for a, b in spans:
-        if merged and a - merged[-1][1] < 0.08:
+        if merged and a - merged[-1][1] < gap:
             merged[-1] = (merged[-1][0], b)
         else:
             merged.append((a, b))
-    return total, merged
+    return merged
 
 
 def main():

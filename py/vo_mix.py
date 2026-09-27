@@ -30,20 +30,14 @@ FADE = 0.015
 LUFS = CFG.get("voiceover", {}).get("lufs", -16)
 
 
-def main():
-    plan = json.loads((ROOT / arg("--plan", "voiceover/plan.json")).read_text(encoding="utf-8"))
-    silent = ROOT / "out" / f"{NAME}-silent.mp4"
-    if not silent.exists():
-        sys.exit(f"no out/{silent.name} (run: ghostcast assemble)")
-    starts, total = take_starts()
-    missing = [i["take"] for i in timeline()["items"] if i["take"] not in starts]
-    if missing:
-        sys.exit(f"takes without clips: {', '.join(missing)} (cut them and assemble first)")
-    takes = {k: {"start": a, "end": b, "segments": {s["segment"]: s["start"] for s in clip_meta(k)["segments"]}}
-             for k, (a, b) in starts.items()}
+def place(pieces, takes, total):
+    """Where each piece lands in the cut, and the problems worth reporting.
 
+    takes: {take: {"start", "end", "segments": {segment: start within the take}}}, in cut seconds.
+    Returns (placed, problems): each placed piece is the piece plus its anchor, start and end.
+    """
     placed, prev_end, problems = [], 0.0, []
-    for p in plan["pieces"]:
+    for p in pieces:
         where = f"piece {p['clip']} [{p['from']}–{p['to']}]"
         if p["take"] not in takes:
             sys.exit(f"{where}: no take {p['take']} in timeline.json")
@@ -61,6 +55,21 @@ def main():
         sys.exit("the plan has no pieces")
     if prev_end > total:
         problems.append(f"voice-over ends at {prev_end:.2f}s, after the video ({total:.2f}s)")
+    return placed, problems
+
+
+def main():
+    plan = json.loads((ROOT / arg("--plan", "voiceover/plan.json")).read_text(encoding="utf-8"))
+    silent = ROOT / "out" / f"{NAME}-silent.mp4"
+    if not silent.exists():
+        sys.exit(f"no out/{silent.name} (run: ghostcast assemble)")
+    starts, total = take_starts()
+    missing = [i["take"] for i in timeline()["items"] if i["take"] not in starts]
+    if missing:
+        sys.exit(f"takes without clips: {', '.join(missing)} (cut them and assemble first)")
+    takes = {k: {"start": a, "end": b, "segments": {s["segment"]: s["start"] for s in clip_meta(k)["segments"]}}
+             for k, (a, b) in starts.items()}
+    placed, problems = place(plan["pieces"], takes, total)
 
     inputs, chains = ["-i", silent], []
     for k, p in enumerate(placed):

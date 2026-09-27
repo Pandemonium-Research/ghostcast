@@ -11,7 +11,7 @@ as work lands.
 
 | Stage | Name | Depends on | Status |
 |---|---|---|---|
-| 0 | [Groundwork](#stage-0--groundwork) | — | Not started |
+| 0 | [Groundwork](#stage-0--groundwork) | — | In progress: tests and smoke test done |
 | 1 | [One-command install](#stage-1--one-command-install) | 0 | Not started |
 | 2 | [Isolation](#stage-2--isolation) | 1 | Not started |
 | 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Not started |
@@ -79,6 +79,21 @@ Done when:
 - the tests and the smoke test pass on Windows;
 - every unexercised helper works or has an issue filed;
 - `docs/bakeoff.md` has the baselines.
+
+Progress:
+
+- **Done:**
+  - unit tests against shared JSON vectors in `test/vectors/`, which the stage-1 port must also
+    pass; `vo_mix` placement and `pauses` merging were pulled out into pure functions for them;
+  - the smoke test (`npm test`, about 80 s): init, record, cut, assemble, review, narration
+    timing, pauses, voice-over mix with an independent loudness check, and a failing take.
+- **Fixed along the way:**
+  - the on-screen speed tag rounded to a whole number, so 3.6× showed as "4×" and 2.5× as "2×";
+    it now shows one decimal, matching the cue sheet;
+  - the template's title card was 0.03 s too short for its own narration, so a new project's
+    first `vo-script` reported "too long".
+- **Left:** the editor helpers, which need `ghostcast vscode --accept-server-license-terms`; the
+  render and CPU baselines; the bake-off.
 
 ## Stage 1 · One-command install
 

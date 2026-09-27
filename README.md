@@ -149,6 +149,8 @@ Planned for version 1 ([PLAN.md](PLAN.md)):
 Version 0.1, tested on Windows 11 with Chrome, VS Code 1.138, ffmpeg 8 and Python 3.14. The code
 paths for macOS and Linux exist (Chrome channel, bash profile, fonts) but are untested.
 
+`npm test` runs the unit tests and an end-to-end smoke test; see [`test/README.md`](test/README.md).
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

@@ -17,6 +17,7 @@ export async function setup(h) {
 export default async function (h) {
   await h.seg('title_card', async () => {
     await h.page.evaluate(() => window.play());
-    await h.sleep(3500);
+    // Long enough for the title's narration block (timeline.json) to fit, with vo-script's margin.
+    await h.sleep(4000);
   });
 }

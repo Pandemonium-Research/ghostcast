@@ -1,0 +1,9 @@
+{
+  "about": "The project.json the vectors assume. Tests write it to a temporary project before loading the post-production code.",
+  "name": "test",
+  "viewport": { "width": 1920, "height": 1080, "dpr": 1.5 },
+  "output": { "width": 1920, "height": 1080, "fps": 30, "capSeconds": 180 },
+  "zoom": { "max": 1.5, "fill": 0.62 },
+  "captions": { "size": 34 },
+  "voiceover": { "wordsPerSecond": 2.5, "lufs": -16 }
+}

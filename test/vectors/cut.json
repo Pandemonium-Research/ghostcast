@@ -1,0 +1,104 @@
+{
+  "about": "Cutting: segments from the event log, the smootherstep ease, the zoom view track and the eased box at a time. Times in the log are epoch ms; everything else is seconds. Boxes are [x, y, w, h] in source pixels. Assumes config.json (PRE 0.20 s, POST 0.35 s, ease 0.75 s, zoom max 1.5, fill 0.62).",
+
+  "segments": [
+    {
+      "name": "a plain segment keeps 0.20 s before and 0.35 s after",
+      "log": [[1000, "+a"], [3000, "-a"]],
+      "expected": [{ "name": "a", "a": 0.8, "b": 3.35, "speed": 1.0 }]
+    },
+    {
+      "name": "@4x and @2.5x are fixed speeds",
+      "log": [[5000, "+w@4x"], [9000, "-w@4x"], [10000, "+v@2.5x"], [11000, "-v@2.5x"]],
+      "expected": [
+        { "name": "w@4x", "a": 4.8, "b": 9.35, "speed": 4.0 },
+        { "name": "v@2.5x", "a": 9.8, "b": 11.35, "speed": 2.5 }
+      ]
+    },
+    {
+      "name": "@fit3 plays in 3 s however long the segment took",
+      "log": [[10000, "+x@fit3"], [22000, "-x@fit3"]],
+      "expected": [{ "name": "x@fit3", "a": 9.8, "b": 22.35, "speed": 4.183333333333334 }]
+    },
+    {
+      "name": "@fit never plays slower than real time",
+      "log": [[0, "+y@fit5"], [2000, "-y@fit5"]],
+      "expected": [{ "name": "y@fit5", "a": -0.2, "b": 2.35, "speed": 1.0 }]
+    },
+    {
+      "name": "unclosed segments, stray ends and other events are ignored",
+      "log": [[0, "viewport", { "w": 1920, "h": 1080, "dpr": 1.5 }], [0, "+open"], [500, "-never"],
+              [1000, "+b"], [1500, "focus", { "x": 0, "y": 0, "w": 10, "h": 10 }], [2000, "-b"]],
+      "expected": [{ "name": "b", "a": 0.8, "b": 2.35, "speed": 1.0 }]
+    },
+    {
+      "name": "segments come out in start order, even when nested",
+      "log": [[0, "+outer"], [1000, "+inner"], [2000, "-inner"], [3000, "-outer"]],
+      "expected": [
+        { "name": "outer", "a": -0.2, "b": 3.35, "speed": 1.0 },
+        { "name": "inner", "a": 0.8, "b": 2.35, "speed": 1.0 }
+      ]
+    }
+  ],
+
+  "smooth": [[0, 0], [1, 1], [0.5, 0.5], [0.25, 0.103515625], [-1, 0], [2, 1]],
+
+  "view_track": [
+    {
+      "name": "a small target near a corner: the view is capped by zoom max and clamped to the frame",
+      "src": [2880, 1620], "dpr": 1.5,
+      "log": [[1000, "+s"], [2000, "focus", { "x": 100, "y": 100, "w": 200, "h": 40 }], [4000, "unfocus"], [5000, "-s"]],
+      "expected": [[-1e18, [0, 0, 2880, 1620]], [2.0, [0, 0, 1920, 1080]], [4.0, [0, 0, 2880, 1620]]]
+    },
+    {
+      "name": "a centred target",
+      "src": [2880, 1620], "dpr": 1.5,
+      "log": [[2000, "focus", { "x": 900, "y": 500, "w": 120, "h": 40 }]],
+      "expected": [[-1e18, [0, 0, 2880, 1620]], [2.0, [480, 240, 1920, 1080]]]
+    },
+    {
+      "name": "a focus's own zoom caps the magnification",
+      "src": [2880, 1620], "dpr": 1.5,
+      "log": [[2000, "focus", { "x": 900, "y": 500, "w": 120, "h": 40, "zoom": 1.2 }]],
+      "expected": [[-1e18, [0, 0, 2880, 1620]], [2.0, [240, 105, 2400, 1350]]]
+    },
+    {
+      "name": "a full-width target has nowhere to zoom to",
+      "src": [2880, 1620], "dpr": 1.5,
+      "log": [[2000, "focus", { "x": 0, "y": 200, "w": 1300, "h": 60 }]],
+      "expected": [[-1e18, [0, 0, 2880, 1620]], [2.0, [0, 0, 2880, 1620]]]
+    },
+    {
+      "name": "a tall target is sized by its height",
+      "src": [2880, 1620], "dpr": 1.5,
+      "log": [[2000, "focus", { "x": 900, "y": 100, "w": 100, "h": 500 }]],
+      "expected": [[-1e18, [0, 0, 2880, 1620]], [2.0, [349.731182795699, 0, 2150.537634408602, 1209.6774193548388]]]
+    }
+  ],
+
+  "box_at": [
+    {
+      "name": "ease in, hold, ease out",
+      "keys": [[-1e18, [0, 0, 2880, 1620]], [10, [480, 240, 1920, 1080]], [20, [0, 0, 2880, 1620]]],
+      "samples": [
+        [5, [0, 0, 2880, 1620]],
+        [10, [0, 0, 2880, 1620]],
+        [10.1875, [49.6875, 24.84375, 2780.625, 1564.1015625]],
+        [10.375, [240, 120, 2400, 1350]],
+        [10.75, [480, 240, 1920, 1080]],
+        [15, [480, 240, 1920, 1080]],
+        [20.375, [240, 120, 2400, 1350]],
+        [21, [0, 0, 2880, 1620]]
+      ]
+    },
+    {
+      "name": "a move that starts mid-move blends from the moving box, so nothing jumps",
+      "keys": [[-1e18, [0, 0, 2880, 1620]], [10, [480, 240, 1920, 1080]], [10.375, [0, 0, 2880, 1620]]],
+      "samples": [
+        [10.375, [240, 120, 2400, 1350]],
+        [10.75, [240, 120, 2400, 1350]],
+        [11.125, [0, 0, 2880, 1620]]
+      ]
+    }
+  ]
+}

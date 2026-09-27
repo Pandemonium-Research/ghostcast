@@ -1,0 +1,51 @@
+{
+  "about": "Assembling: caption windows in clip seconds, [text, start, end, position], and the on-screen speed tags. Every segment at 1.5x or more gets a corner tag.",
+
+  "windows": [
+    {
+      "name": "captions anchored to segments, with defaults and clamping, plus a speed tag",
+      "item": {
+        "take": "t",
+        "captions": [
+          { "text": "one", "from": "s_a", "at": 0.5 },
+          { "text": "two", "from": "s_c", "at": 1.0, "until": 2.5, "pos": "top" },
+          { "text": "three" },
+          { "text": "four", "from": "s_c", "at": 0.0, "until": 9.0 }
+        ]
+      },
+      "meta": {
+        "duration": 10.0,
+        "segments": [
+          { "segment": "s_a", "start": 0.0, "end": 4.0, "speed": 1.0 },
+          { "segment": "s_b@fit2", "start": 4.0, "end": 6.0, "speed": 3.6 },
+          { "segment": "s_c", "start": 6.0, "end": 10.0, "speed": 1.4 }
+        ]
+      },
+      "expected": [
+        ["one", 0.5, 4.0, "bottom"],
+        ["two", 7.0, 8.5, "top"],
+        ["three", 0.0, 10.0, "bottom"],
+        ["four", 6.0, 10.0, "bottom"],
+        ["3.6×", 4.0, 6.0, "corner"]
+      ]
+    }
+  ],
+
+  "windows_errors": [
+    {
+      "name": "a caption naming a segment the take doesn't have",
+      "item": { "take": "t", "captions": [{ "text": "x", "from": "nope" }] },
+      "meta": { "duration": 4.0, "segments": [{ "segment": "s_a", "start": 0.0, "end": 4.0, "speed": 1.0 }] }
+    }
+  ],
+
+  "speed_tag": [
+    [1.5, "1.5×"],
+    [2, "2×"],
+    [2.5, "2.5×"],
+    [3.6, "3.6×"],
+    [2.96, "3×"],
+    [4.04, "4×"],
+    [4.183333333333334, "4.2×"]
+  ]
+}

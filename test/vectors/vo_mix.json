@@ -1,0 +1,48 @@
+{
+  "about": "Voice-over placement: each piece starts at its beat (take start + segment start + offset), or 0.25 s after the previous piece if that is still speaking. Problems: a piece running past its take by more than its spill (default 1.5 s), and a voice-over running past the video.",
+
+  "place": [
+    {
+      "name": "anchors, queueing behind a piece still speaking, spill and overrun",
+      "total": 12,
+      "takes": {
+        "intro": { "start": 0, "end": 5, "segments": { "intro_a": 0, "intro_b": 2.5 } },
+        "build": { "start": 5, "end": 12, "segments": { "build_run": 1.0 } }
+      },
+      "pieces": [
+        { "clip": "A1.m4a", "from": 0.5, "to": 3.5, "take": "intro", "offset": 0.4 },
+        { "clip": "A1.m4a", "from": 3.5, "to": 5.0, "take": "intro", "segment": "intro_b", "offset": 0.2 },
+        { "clip": "A2.m4a", "from": 0, "to": 4, "take": "build", "segment": "build_run", "offset": 0.5 },
+        { "clip": "A2.m4a", "from": 4, "to": 9, "take": "build", "spill": 0.5 }
+      ],
+      "expected": [
+        { "anchor": 0.4, "start": 0.4, "end": 3.4 },
+        { "anchor": 2.7, "start": 3.65, "end": 5.15 },
+        { "anchor": 6.5, "start": 6.5, "end": 10.5 },
+        { "anchor": 5.0, "start": 10.75, "end": 15.75 }
+      ],
+      "problems": [
+        "piece A2.m4a [4–9] ends 3.8s after take build",
+        "voice-over ends at 15.75s, after the video (12.00s)"
+      ]
+    }
+  ],
+
+  "place_errors": [
+    {
+      "name": "a piece naming a take that isn't in the cut",
+      "total": 5, "takes": { "intro": { "start": 0, "end": 5, "segments": {} } },
+      "pieces": [{ "clip": "A1.m4a", "from": 0, "to": 1, "take": "outro" }]
+    },
+    {
+      "name": "a piece naming a segment its take doesn't have",
+      "total": 5, "takes": { "intro": { "start": 0, "end": 5, "segments": { "intro_a": 0 } } },
+      "pieces": [{ "clip": "A1.m4a", "from": 0, "to": 1, "take": "intro", "segment": "intro_z" }]
+    },
+    {
+      "name": "a plan with no pieces",
+      "total": 5, "takes": { "intro": { "start": 0, "end": 5, "segments": {} } },
+      "pieces": []
+    }
+  ]
+}

@@ -70,8 +70,18 @@ def windows(item, meta):
         out.append((c["text"], a, min(b, meta["duration"]), c.get("pos", "bottom")))
     for s in meta["segments"]:
         if s.get("speed", 1) >= 1.5:
-            out.append((f"{round(s['speed'])}×", s["start"], s["end"], "corner"))
+            out.append((speed_tag(s["speed"]), s["start"], s["end"], "corner"))
     return out
+
+
+def speed_tag(speed):
+    """The on-screen tag for a sped-up stretch: "4×", or "2.5×" when the factor isn't whole.
+
+    One decimal, so the tag is never more than 0.05 off the real factor (and agrees with the cue
+    sheet); plain round() would show 3.6× as "4×", and 2.5× as "2×".
+    """
+    tag = f"{speed:.1f}"
+    return (tag[:-2] if tag.endswith(".0") else tag) + "×"
 
 
 def render_take(item, tmp):
