@@ -92,8 +92,27 @@ Progress:
     it now shows one decimal, matching the cue sheet;
   - the template's title card was 0.03 s too short for its own narration, so a new project's
     first `vo-script` reported "too long".
-- **Left:** the editor helpers, which need `ghostcast vscode --accept-server-license-terms`; the
-  render and CPU baselines; the bake-off.
+- **Editor helpers verified** on a fresh VS Code server build: split terminals (`useTerm`,
+  `focusTerminal(i)`), `openFile`, `resizePanel` from a maximized panel, `gotoLine`,
+  `focusEditor`, `editorRect` across split editors, and `h.waitFor` on a full-screen terminal
+  app with no prompt (a stand-in for an agent TUI). `--headed` was left out: it opens a window
+  on the user's screen.
+- **Found and fixed by the editor check:**
+  - *The first editor take on a new project failed.* `code serve-web` downloads its server
+    (about 600 MB) on the first page load; here that took about six minutes, and `vscode.open`
+    gives up after two 45-second tries. `ghostcast vscode` now starts the download itself and
+    prints "VS Code is ready" when it is over.
+  - *Deep project paths broke the terminal on Windows.* The server lived in the project
+    (`vscode/cli-data/…`), and its deepest files sit about 166 characters below that; from a deep
+    folder the path to `conpty.dll` passed 260 characters and the terminal failed with "Cannot
+    find conpty.dll". The server now lives once per machine in a short cache folder
+    (`%LOCALAPPDATA%\ghostcast` on Windows; `GHOSTCAST_CACHE` overrides), which `doctor` checks.
+    The same project that failed from a deep folder now records. Stage 2's isolated copies must
+    keep their own paths short too.
+- **Found, for later stages:** terminal-only frames are mostly empty (small text on a wide,
+  empty terminal), as in the Skilldex cut. That's for the camera policy (stage 5) and the checks
+  (stage 6).
+- **Left:** the render and CPU baselines, and the bake-off.
 
 ## Stage 1 · One-command install
 

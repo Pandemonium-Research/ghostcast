@@ -58,6 +58,15 @@ check first.
   yourself or expect the next take to start differently.
 - **Order editors by their box.** `.view-lines` moves with scrolling, so the helpers order
   `.monaco-editor` containers by their on-screen position.
+- **The server downloads itself first.** On the first page load for a new VS Code version,
+  serve-web downloads its server (about 600 MB) and shows "is downloading, please wait" until it
+  is done; that can take minutes, and a scene started meanwhile fails. `ghostcast vscode` starts
+  the download itself and prints "VS Code is ready" when it is over; record after that. The
+  download is kept once per machine (see `ghostcast doctor` for where), not per project.
+- **Long paths on Windows.** The server's deepest files sit about 166 characters below its
+  folder. Past Windows' 260-character limit the terminal fails to start ("Cannot find
+  conpty.dll"). The shared folder is short by default; `doctor` checks it, and `GHOSTCAST_CACHE`
+  moves it.
 - **The first load sometimes fails.** This happens when takes run back to back, and on a
   server's very first start, while it is still unpacking. `vscode.open` reloads once, and
   `ghostcast all` retries a failed take once.

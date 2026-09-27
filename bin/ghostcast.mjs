@@ -4,6 +4,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +19,8 @@ const HELP = `ghostcast — a recording studio for coding agents
   ghostcast doctor                      check Chrome, ffmpeg, Python + Pillow, VS Code
   ghostcast vscode [--port 8765] --accept-server-license-terms
                                         serve VS Code in the browser for terminal/editor scenes
-                                        (runs until stopped; start it in the background)
+                                        (runs until stopped; start it in the background, and
+                                        record once it prints "VS Code is ready")
 
   ghostcast record <take> [--headed]    run the take's scene and capture it to raw/<take>/
   ghostcast cut <take> [...]            raw/<take>/ → clips/<take>.mp4 (segments, speed, zoom)
@@ -96,6 +98,52 @@ function which(bin) {
   return r.status === 0 ? r.stdout.split(/\r?\n/)[0].trim() : null;
 }
 
+// Files ghostcast keeps once per machine rather than per project: GHOSTCAST_CACHE, or the platform's
+// cache folder.
+function cacheDir() {
+  if (process.env.GHOSTCAST_CACHE) return path.resolve(process.env.GHOSTCAST_CACHE);
+  if (process.platform === 'win32') return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'ghostcast');
+  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Caches', 'ghostcast');
+  return path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'ghostcast');
+}
+
+// The VS Code server that `code serve-web` downloads (about 600 MB a build) lives in the cache, shared
+// by every project: the download takes minutes, and from inside a deep project folder its files pass
+// Windows' 260-character path limit (the terminal then fails with "Cannot find conpty.dll").
+const vscodeCliDir = () => path.join(cacheDir(), 'vscode-cli');
+// The deepest file in a server build is about 166 characters below that folder (VS Code 1.138).
+const SERVER_DEPTH = 175;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const getText = (url) => new Promise((resolve, reject) => {
+  http.get(url, (res) => {
+    let body = '';
+    res.setEncoding('utf8');
+    res.on('data', (c) => { body += c; });
+    res.on('end', () => resolve(body));
+  }).on('error', reject);
+});
+
+// serve-web downloads its server on the first page load, and a scene started before the download ends
+// fails. Load the page from here, so the download starts now, and say when VS Code is ready.
+async function announceReady(port, token, server) {
+  let told = false;
+  while (server.exitCode === null) {
+    try {
+      const body = await getText(`http://127.0.0.1:${port}/?tkn=${token}`);
+      if (!/is downloading/.test(body)) {
+        console.log(`ghostcast: VS Code is ready on http://127.0.0.1:${port}`);
+        return;
+      }
+      if (!told) {
+        console.log('ghostcast: downloading the VS Code server; this happens once per VS Code version and can take a few minutes');
+        told = true;
+      }
+    } catch {}   // not listening yet
+    await sleep(2000);
+  }
+}
+
 function gitBash() {
   const candidates = [
     'C:\\Program Files\\Git\\bin\\bash.exe',
@@ -158,6 +206,16 @@ const commands = {
     check(`Python + Pillow (${p})`, pil.status === 0 && `Pillow ${pil.stdout.trim()}`, `${p} -m pip install pillow`);
     check('VS Code CLI (only for terminal/editor scenes)', which('code'), 'install VS Code and its `code` command');
     if (process.platform === 'win32') check('Git Bash (terminal scenes on Windows)', gitBash(), 'install Git for Windows');
+    const cli = vscodeCliDir();
+    let builds = [];
+    try { builds = fs.readdirSync(path.join(cli, 'serve-web')).filter((d) => /^[0-9a-f]{40}$/.test(d)); } catch {}
+    console.log(`info  VS Code server cache: ${cli}\n      ${builds.length
+      ? `${builds.length} build(s) downloaded`
+      : 'empty: the first `ghostcast vscode` downloads a build (about 600 MB), which can take a few minutes'}`);
+    if (process.platform === 'win32') {
+      check('VS Code server cache path short enough for Windows', cli.length + SERVER_DEPTH <= 259,
+        `the server's files would pass Windows' 260-character path limit; set GHOSTCAST_CACHE to a folder at most ${259 - SERVER_DEPTH - '\\vscode-cli'.length} characters long`);
+    }
     process.exit(bad ? 1 : 0);
   },
 
@@ -173,13 +231,17 @@ const commands = {
     if (!fs.existsSync(token)) fs.writeFileSync(token, crypto.randomBytes(16).toString('hex'));
     const serverData = path.join(v, 'server-data');
     writeMachineSettings(serverData);
+    const cli = vscodeCliDir();
+    fs.mkdirSync(cli, { recursive: true });
     const args = ['serve-web', '--host', '127.0.0.1', '--port', port, '--connection-token-file', token,
-      '--accept-server-license-terms', '--server-data-dir', serverData, '--cli-data-dir', path.join(v, 'cli-data')];
-    console.log(`VS Code on http://127.0.0.1:${port} (token in vscode/token); stop with Ctrl+C`);
+      '--accept-server-license-terms', '--server-data-dir', serverData, '--cli-data-dir', cli];
+    console.log(`VS Code on http://127.0.0.1:${port} (token in vscode/token; server files in ${cli}); stop with Ctrl+C.\n`
+      + 'Record once "VS Code is ready" is printed.');
     // On Windows `code` is a .cmd script, which needs a shell; the shell needs paths quoted.
     const win = process.platform === 'win32';
     const p = spawn('code', win ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args, { stdio: 'inherit', shell: win });
     p.on('exit', (code) => process.exit(code ?? 0));
+    announceReady(port, fs.readFileSync(token, 'utf8').trim(), p);
   },
 
   async record() {

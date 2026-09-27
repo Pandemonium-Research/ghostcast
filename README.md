@@ -76,7 +76,9 @@ npm install                       # Playwright only; it uses your installed Chro
 node bin/ghostcast.mjs doctor
 node bin/ghostcast.mjs init ../my-demo && cd ../my-demo
 
-# Terminal/editor takes need VS Code served (read the license first; this flag accepts it):
+# Terminal/editor takes need VS Code served (read the license first; this flag accepts it).
+# The first time, it downloads the VS Code server (about 600 MB, once per machine); wait for
+# "VS Code is ready" before recording.
 node ../ghostcast/bin/ghostcast.mjs vscode --accept-server-license-terms &
 
 node ../ghostcast/bin/ghostcast.mjs all          # record + cut every take, then assemble
