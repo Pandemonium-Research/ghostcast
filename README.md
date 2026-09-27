@@ -1,17 +1,24 @@
 # ghostcast
 
-*Screencasts with nobody at the keyboard.* A ghost types, clicks and scrolls in an off-screen
-browser while your agent directs.
+*Screencasts with nobody at the keyboard.* ghostcast films real software in the background
+(terminals, editors and web apps) while your agent directs.
 
-A recording studio for coding agents. Scripted, headless screencasts of **real** terminals,
-editors and web pages. They are cut to the beats, eased into zooms, captioned, tagged wherever
-time is sped up, and laid with a human voice-over.
+> **Status: 0.1, the recording engine.** Everything below works today. [VISION.md](VISION.md)
+> describes the product being built on it, and [PLAN.md](PLAN.md) the stages toward version 1.
 
 An agent writes a scene per shot: open VS Code on a project, type a command, zoom onto the line
-that answers it. `ghostcast` then plays the scene in an off-screen Chrome and keeps every frame, so
-nothing on your screen is recorded and nothing on it gets in the way. Post-production is
-deterministic: a retake is one command, and the edit is data (`timeline.json`,
-`voiceover/plan.json`), not a timeline in a video editor.
+that answers it. ghostcast plays the scene in an off-screen Chrome and keeps every frame, so
+nothing on your screen is recorded and nothing on it gets in the way. The frames become a
+finished video:
+
+- cut to the beats;
+- eased into zooms on what matters;
+- captioned;
+- tagged wherever time is sped up;
+- with recorded narration laid on the beats it describes.
+
+Post-production is deterministic: a retake is one command, and the edit is data
+(`timeline.json`, `voiceover/plan.json`), not a timeline in a video editor.
 
 Recording real tools without a screen has sharp edges: frames that stop arriving, keystrokes
 that vanish, terminals that ignore synthetic input. ghostcast handles them, and
@@ -26,21 +33,30 @@ scene.mjs ──record──▶ raw/<take>/ frames + event log
                       voiceover/*.m4a + plan.json ──vo-mix: place, fade, −16 LUFS──▶ out/<name>.mp4
 ```
 
-## Why another one
+## Why ghostcast
 
-Several tools make product videos with agents; see the list below. Most drive a **web app**
-with Playwright and narrate it with **TTS**. This one is for demos those tools don't cover.
+Plenty of tools make videos with agents now. Most film a web app and narrate it with generated
+speech; some draw terminals instead of filming them, or rebuild the product's UI in code.
+ghostcast is for videos of software as it really runs.
 
-- **Real terminal and editor sessions.** VS Code runs in the browser (`code serve-web`) with a
-  clean shell. Commands are typed at a human pace, checked on screen before Enter, and waited
-  on until the prompt returns. Agent CLIs (Claude Code, Codex) can run on camera. Zoom
-  rectangles fit the text of a terminal row or editor line.
-- **A human voice.** The narrator reads a generated script that says whether each block fits
-  its time. Their clips are split at detected pauses, each piece is anchored to the beat it
-  describes, and the mix is normalised for broadcast loudness.
-- **Delivery constraints** (conference submissions, launch posts, docs). A length cap is
-  checked on every assemble. A cue sheet gives
-  every segment's start. Every sped-up stretch is tagged on screen automatically.
+- **Real terminals, a real editor, real web apps, filmed as pixels.**
+  - VS Code runs in the browser (`code serve-web`) with a clean shell.
+  - Commands are typed at a human pace, checked on screen before Enter, and waited on until the
+    prompt returns.
+  - Agent CLIs (Claude Code, Codex) can run on camera.
+  - Nothing is drawn or rebuilt.
+- **In the background.** Everything is captured from a headless browser: nothing on your screen
+  is recorded, and nothing on it is touched.
+- **Framed from the page.** ghostcast knows what's on the page, so zoom rectangles fit the text of
+  a terminal row or an editor line, not a guess from pixels.
+- **Honest by design.**
+  - Everything shown really runs.
+  - Every sped-up stretch is tagged `N×` on screen.
+  - A length cap is checked on every assemble, and a cue sheet gives every beat's start.
+- **Your own voice, placed by beat.**
+  - The narrator reads from a generated script that says whether each block fits.
+  - Their clips are split at detected pauses, and each piece is anchored to the beat it describes.
+  - The mix is normalised for broadcast loudness.
 - **Agents review their own footage.** Contact sheets and stills are PNGs an agent can look at,
   and a failed take leaves a screenshot of where it stopped.
 
@@ -109,6 +125,25 @@ export default async function (h) {
 }
 ```
 
+## Where it's going
+
+ghostcast is growing into two things (details in [VISION.md](VISION.md)):
+
+- **A studio for developer-tool videos.** Your agent plans a storyboard with you; ghostcast
+  prepares, rehearses, shoots, checks and voices it in the background. It uses Kokoro speech by
+  default, ElevenLabs with your own key, or your own voice through a recording booth.
+- **An engine** that other video pipelines call when they need real footage of real software.
+
+Planned for version 1 ([PLAN.md](PLAN.md)):
+
+- one-command install (`npx ghostcast`);
+- every shoot in an isolated copy of your project, so your checkout is never touched;
+- quick shoots with no configuration;
+- storyboards instead of scripts, with automatic camera, holds and checks;
+- voice from any source, placed by beat;
+- output presets for GitHub, social feeds, YouTube and submissions;
+- a JSON interface for other pipelines.
+
 ## Status
 
 Version 0.1, tested on Windows 11 with Chrome, VS Code 1.138, ffmpeg 8 and Python 3.14. The code
@@ -120,19 +155,23 @@ MIT. See [LICENSE](LICENSE).
 
 ## Related tools
 
-If your demo is a web app narrated by TTS, these may fit better:
+If your video is a different kind, one of these may fit better:
 
-- [reelson](https://github.com/reelson/reelson): agent skills plus a CLI for product videos
-  from web apps. It has a screencast mode.
-- [aidemo](https://aidemo.top/): turns a prompt into a narrated web-app demo video over MCP.
-- [agent-demo-video](https://github.com/OrionArchitekton/agent-demo-video): Playwright
-  recording plus TTS for agent demos.
-- [Agent Demo Studio](https://glama.ai/mcp/servers/khajaaijaz26/agent-demo-studio) and
-  [OpenVidStudio](https://glama.ai/mcp/servers/AnayDhawan/openvidstudio): MCP servers that
-  record with Playwright and compose with Remotion.
-- [Pagecast](https://www.claudedirectory.org/mcp-servers/mcpware-pagecast): an MCP server that
-  records browser pages.
-- [OpenScreen](https://github.com/getopenscreen/openscreen): desktop screen recording, with
-  zooms described in JSON.
-- [Claude-Code-Video-Toolkit](https://github.com/wilwaldon/Claude-Code-Video-Toolkit):
-  Remotion-based video generation with Claude Code.
+- **Many kinds of video from one agent-driven pipeline:**
+  [OpenMontage](https://github.com/calesthio/OpenMontage), with a screen-demo pipeline among
+  many others.
+- **A web app, narrated by generated speech:**
+  - [openvidstudio](https://github.com/AnayDhawan/openvidstudio)
+  - [aidemo](https://aidemo.top/)
+  - [reelson](https://github.com/reelson/reelson)
+  - [agent-demo-video](https://github.com/OrionArchitekton/agent-demo-video)
+  - [screencli](https://screencli.sh)
+- **The product's UI rebuilt as animation:**
+  [agentic-product-demo](https://github.com/Alexwtlf/agentic-product-demo).
+- **Recording yourself, polished automatically:**
+  [OpenScreen](https://github.com/getopenscreen/openscreen) and
+  [Screen Studio](https://screen.studio).
+- **Terminal only:** [VHS](https://github.com/charmbracelet/vhs).
+- **Motion graphics written as code:**
+  [HyperFrames](https://github.com/heygen-com/hyperframes) and
+  [Remotion](https://www.remotion.dev).
