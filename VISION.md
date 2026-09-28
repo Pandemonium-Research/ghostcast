@@ -349,7 +349,7 @@ rendering are common in agent video tools. ghostcast doesn't claim them as its d
 | Kind | Examples | Good at | How it films software |
 |---|---|---|---|
 | Agentic production systems | OpenMontage | Many video types, a staged workflow with approvals, many speech and footage providers | Terminals drawn synthetically; real apps through desktop capture or Playwright |
-| Agent demo tools | openvidstudio, aidemo, reelson, agent-demo-video, screencli, playwright-recast | Web-app demos from a plan or test, narrated by generated speech | Mostly browser capture (openvidstudio adds desktop and mobile); terminals as timed text, if at all; no scripted editor |
+| Agent demo tools | openvidstudio, aidemo, reelson, agent-demo-video, screencli, playwright-recast | Web-app demos from a plan or test, narrated by generated speech; aidemo also has pre-recording lint, QA, variants and local speech | Browser capture. Pointed at VS Code in the browser, some can film a terminal and an editor, but with no help for either ([bake-off](docs/bakeoff.md)) |
 | UI rebuilt as code | agentic-product-demo | Pixel-perfect motion from the product's code | Not filmed: the UI is recreated in Remotion |
 | Record yourself, polished by AI | Screen Studio, OpenScreen, Clueso, Guidde, Trupeer | Auto-zoom and voice on a human performance | Your desktop, while you perform |
 | Agent proof of work | Cursor cloud agents, Devin, Playwright's agent CLI | Showing a reviewer that a change works | Cloud machines, or raw browser recordings |
@@ -357,10 +357,13 @@ rendering are common in agent video tools. ghostcast doesn't claim them as its d
 
 ghostcast's ground is narrower and specific:
 
-1. real terminals, a real editor and real web apps, filmed as pixels, headlessly;
+1. real terminals, a real editor and real web apps, filmed as pixels, headlessly, and reliably:
+   trust dialogs and layout handled, typing confirmed on screen, the prompt waited for;
 2. nothing on your screen touched, and nothing in your working copy either;
 3. a camera and checks driven by what's on the page;
-4. everything shown is real, so anyone can re-run the demo;
+4. everything shown is real, so anyone can re-run the demo, and fitting a video to its voice
+   never cuts the moment a beat is about (the [bake-off](docs/bakeoff.md) shows what happens
+   when it does);
 5. your own voice, placed by beat, alongside generated speech.
 
 ## Proof

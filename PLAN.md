@@ -11,7 +11,7 @@ as work lands.
 
 | Stage | Name | Depends on | Status |
 |---|---|---|---|
-| 0 | [Groundwork](#stage-0--groundwork) | — | In progress: tests and smoke test done |
+| 0 | [Groundwork](#stage-0--groundwork) | — | Done: see [docs/bakeoff.md](docs/bakeoff.md) |
 | 1 | [One-command install](#stage-1--one-command-install) | 0 | Not started |
 | 2 | [Isolation](#stage-2--isolation) | 1 | Not started |
 | 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Not started |
@@ -112,7 +112,16 @@ Progress:
 - **Found, for later stages:** terminal-only frames are mostly empty (small text on a wide,
   empty terminal), as in the Skilldex cut. That's for the camera policy (stage 5) and the checks
   (stage 6).
-- **Left:** the render and CPU baselines, and the bake-off.
+- **The bake-off and the baselines** are in [docs/bakeoff.md](docs/bakeoff.md). In short:
+  - aidemo, reelson and openvidstudio were given the same three-beat Skilldex story.
+  - aidemo finished it on its fifth run, but its fitting cut the terminal beat's payoff, and its
+    speed-ups aren't marked on screen.
+  - reelson recorded it, but can't compose on Windows.
+  - openvidstudio can't type, so it filmed the web beat only.
+  - ghostcast 0.1 finished it on its second run, with the claim on screen when it's said.
+  - Baselines: cutting takes 1.6–2.7 s per output second, and assembling averages 70% CPU on a
+    16-thread machine.
+  - What this changes is folded into stages 1, 4 and 7 below and into "Small items".
 
 ## Stage 1 · One-command install
 
@@ -142,7 +151,14 @@ Build:
     it and VS Code use xterm.js;
   - VS Code stays available as the editor surface.
 - **`ghostcast doctor`** finds Chrome and ffmpeg, and offers a fix when they are missing.
-- **macOS and Linux** run the sample project end to end.
+- **macOS and Linux** run the sample project end to end, and the smoke test runs on all three
+  operating systems. Two of the three tools in the bake-off broke on Windows out of the box;
+  keeping all three working is part of the product.
+- **A legible default viewport:** 1440×810 CSS pixels at `dpr` 2. At 1920 CSS pixels a site's
+  body text ends up about 14 px on screen (the bake-off used 1440 for every tool).
+- **Speed and footprint:** the new post-production runs at low priority, and aims for at most
+  0.5 s of work per second of output. The 0.1 baseline is 1.6–2.7 s for cutting, and assembling
+  averages 70% of a 16-thread machine.
 
 Decide:
 
@@ -156,7 +172,8 @@ Done when:
   Python installed;
 - the stage-0 tests pass against the Node code;
 - the terminal sample take runs without VS Code;
-- changing one caption re-renders one beat.
+- changing one caption re-renders one beat;
+- the bake-off's ghostcast cut renders at 0.5 s or less per output second.
 
 ## Stage 2 · Isolation
 
@@ -227,7 +244,11 @@ Build:
   - one claim per beat;
   - each beat's narration within its word budget;
   - panels within their share of the runtime;
-  - the total within the cap.
+  - the total within the cap;
+  - borrowing from aidemo's lint, which the bake-off showed works before anything is recorded:
+    - predicted pacing per beat (actions against narration);
+    - text too small for the viewport;
+    - an action with nothing to wait on after it.
 - **The compiler: storyboard to scene.** The verbs `open`, `click`, `fill`, `press`, `run` and
   `wait` map to Playwright and today's helpers. `code:` takes Playwright code, and `script:`
   points at a code scene.
@@ -317,6 +338,8 @@ without changing the storyboard.
 Build:
 
 - **Kokoro by default.** Through kokoro-js on the CPU:
+  - installed on demand, the first time a video has narration, never as a core dependency:
+    kokoro-js pulls in about 400 MB (onnxruntime, sharp, transformers);
   - the q8 model is about 86 MB, downloaded on first use; `doctor` says so;
   - lines are generated one sentence at a time, so each line's timing is known.
 - **ElevenLabs with your own key.**
@@ -432,6 +455,9 @@ These can go in whenever they're next to other work:
   call.
 - **The serve-web token** appears in serve-web's own log. The server is loopback-only, but logs
   shouldn't be shared as they are.
+- **Locators everywhere:** `h.focus` and `h.mark` should accept a Playwright locator, as
+  `h.point` and `h.tap` do; today a locator fails with a serialisation error (found in the
+  bake-off).
 
 ## Risks
 
