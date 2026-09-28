@@ -156,3 +156,7 @@ most of a 16-thread machine while it runs.
 - ghostcast's run used 0.1 as committed, plus uncommitted edits in the working tree to
   `py/cut.py`, `src/driver.js` and `src/recorder.mjs` (a `speeds` setting and new mark shapes)
   that the story didn't use.
+- Found afterwards: ghostcast's capture in this run was not oversampled. Chrome's screencast sent
+  frames at the page's CSS size (1440×810), so ghostcast's 1080p cut was upscaled and its zooms were
+  softer than they should have been. The recorder now runs Chrome at the device scale, which gives
+  true 2880×1620 frames.

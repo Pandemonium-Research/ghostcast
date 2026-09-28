@@ -29,6 +29,10 @@ check first.
 - **A full-width target can't be zoomed in on.** The view is sized so the target fills about
   62 % of it (`zoom.fill`). A block as wide as the page already fills it. Focus a heading, a
   line, or a text-fitted rectangle (`termRect`, `editorRect`), not a container.
+- **The capture is oversampled only with Chrome at the device scale.** The screencast sends frames
+  at the page's CSS size unless Chrome runs with `--force-device-scale-factor`; the recorder passes
+  it, so frames are `viewport.dpr` × the viewport (2880×1620 by default). Without it, 1080p output
+  is upscaled and every zoom is soft.
 - **Past `viewport.dpr`, zoom costs sharpness.** The capture is oversampled by dpr (2 by
   default). `zoom.max` defaults to the larger of 1.5 and dpr.
 - **Terminal rows and editor lines span the full width.** Their rectangles are therefore taken

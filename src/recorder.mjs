@@ -42,10 +42,13 @@ export async function launch(project, { headed = false } = {}) {
     headless: !headed,
     viewport: { width, height },
     deviceScaleFactor: dpr,
+    // The screencast sends frames at the page's CSS size unless Chrome itself runs at the device
+    // scale: deviceScaleFactor alone gives the page a devicePixelRatio but no extra pixels. With the
+    // flag, frames are dpr × the viewport, and zooms up to dpr stay sharp.
     // An off-screen Chrome counts as hidden, and throttles hidden pages: timers slow, rendering
-    // stops, and the screencast goes quiet. These keep it rendering as if it were in front.
+    // stops, and the screencast goes quiet. The rest keep it rendering as if it were in front.
     args: [
-      '--hide-scrollbars', '--force-color-profile=srgb',
+      '--hide-scrollbars', '--force-color-profile=srgb', `--force-device-scale-factor=${dpr}`,
       '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding', '--disable-background-media-suspend',
       '--disable-features=Translate,MediaRouter,CalculateNativeWinOcclusion,IntensiveWakeUpThrottling',
