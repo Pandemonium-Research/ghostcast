@@ -23,6 +23,10 @@
 @keyframes __rec_rip{from{transform:scale(.25);opacity:1}to{transform:scale(1.35);opacity:0}}
 .__rec_mark{position:fixed;pointer-events:none;z-index:2147483645;border-radius:6px;border:3px solid var(--c);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 18%,transparent);opacity:0;transition:opacity .25s ease}
 .__rec_mark.on{opacity:1}
+.__rec_mark.circle{border-radius:50%}
+.__rec_mark.pill{border-radius:999px}
+.__rec_mark.glow{box-shadow:0 0 0 5px color-mix(in srgb,var(--c) 22%,transparent),0 0 30px 12px color-mix(in srgb,var(--c) 45%,transparent)}
+.__rec_mark.glow.bare{border-color:transparent;box-shadow:0 0 34px 14px color-mix(in srgb,var(--c) 55%,transparent)}
 ::selection{background:transparent}`;
   document.documentElement.appendChild(st);
 
@@ -221,11 +225,26 @@
       if (!el) throw new Error('rec: target not found: ' + t);
       return R.union([el], pad);
     },
-    // A box drawn on the page. `pad` applies to elements; a rectangle is drawn as given.
-    mark(t, color = '#d4380d', pad = 8) {
-      const r = R.rectOf(t, pad);
+    // A highlight drawn on the page. `pad` applies to elements; a rectangle is drawn as given.
+    //
+    // The third argument is the padding, or options:
+    //   {pad, shape: 'rect' | 'circle' | 'pill', glow: true | 'bare'}
+    // 'circle' squares the box to its longer side and centres it, so a round target gets a
+    // ring rather than an ellipse. `glow` adds a soft halo; 'bare' drops the ring and leaves
+    // only the halo, which suits a node that already has its own outline.
+    mark(t, color = '#d4380d', opts = 8) {
+      const o = typeof opts === 'number' ? { pad: opts } : (opts || {});
+      let r = R.rectOf(t, o.pad ?? 8);
+      const shape = o.shape ?? 'rect';
+      if (shape === 'circle') {
+        const s = Math.max(r.w, r.h);
+        r = { x: r.x + r.w / 2 - s / 2, y: r.y + r.h / 2 - s / 2, w: s, h: s };
+      }
       const m = document.createElement('div');
-      m.className = '__rec_mark';
+      m.className = '__rec_mark'
+        + (shape === 'rect' ? '' : ` ${shape}`)
+        + (o.glow ? ' glow' : '')
+        + (o.glow === 'bare' ? ' bare' : '');
       m.style.cssText += `left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;--c:${color}`;
       document.documentElement.appendChild(m);
       requestAnimationFrame(() => m.classList.add('on'));

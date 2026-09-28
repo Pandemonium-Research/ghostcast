@@ -171,7 +171,8 @@ export function makeHelpers(project, page, log) {
     async focusTerm(match, opts = {}) { return h.focus(await h.termRect(match, opts), opts); },
     unfocus() { h.log('unfocus'); },
     // A box drawn on the page itself (captured, and zoomed with the content).
-    mark: (target, color = '#d4380d', pad = 8) => ev(([t, c, p]) => { window.__rec.mark(t, c, p); }, [target, color, pad]),
+    // opts: a padding, or {pad, shape: 'rect' | 'circle' | 'pill', glow: true | 'bare'}.
+    mark: (target, color = '#d4380d', opts = 8) => ev(([t, c, o]) => { window.__rec.mark(t, c, o); }, [target, color, opts]),
     unmark: () => ev(() => window.__rec.unmark()),
     // ---- pointer (the drawn cursor; headless Chrome draws none of its own) ----
     cursor: (on) => ev((o) => (o ? window.__rec.show() : window.__rec.hide()), on),

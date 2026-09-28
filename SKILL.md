@@ -58,7 +58,8 @@ building anything. Then map it:
      are current.
    - Check `out/<name>.cues.md` and `ghostcast review final`.
    - Keep to the user's length cap (`output.capSeconds`). To shorten, speed up waits
-     (`@fitN`), trim holds (`trims`), or cut beats. Never raise the cap on your own.
+     (`@fitN`), trim holds (`trims`), speed up a segment that contains a move (`speeds`), or
+     cut beats. Never raise the cap on your own.
 6. **Voice-over.** The user records it; you place it.
    - `ghostcast vo-script` writes `out/voiceover-script.md`: each block, where it starts, and
      whether it fits. Fix any "too long" first. Then give the user the file to read from.

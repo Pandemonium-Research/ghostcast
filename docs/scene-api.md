@@ -22,7 +22,8 @@ is 1.5× that and zooms up to 1.5× stay sharp.
 | `await h.seg(name, async () => {…})` | Marks a beat. Pauses briefly on either side, so the cut's margins stay clean. |
 | name ending `@4x` | Plays the segment at 4× (any factor); the video gets a `4×` tag. |
 | name ending `@fit3` | Plays the segment in 3 s, however long it took (never slower than real time). Use it for installs, builds and model calls. |
-| `project.json` → `trims: {name: seconds}` | Caps a segment's length in the clip, cutting the end of its closing hold. |
+| `project.json` → `trims: {name: seconds}` | Caps a segment's length in the clip, cutting the end of its closing hold. Right for a still hold; on a segment that is easing a zoom back out it cuts the move off part-way. |
+| `project.json` → `speeds: {name: factor}` | Plays the whole segment faster without cutting anything out of it, so every move in it still completes. Use this where a trim would clip a zoom or a scroll. Factors of 1.5 and up are tagged on screen like any other speed-up. |
 
 Name segments `<take>_<beat>`: captions and voice-over pieces refer to them by name.
 
@@ -47,7 +48,7 @@ Name segments `<take>_<beat>`: captions and voice-over pieces refer to them by n
 | `await h.focus(target, {zoom})` | From now on the view eases in on the target (applied in post). `zoom` caps the magnification. Returns the rectangle. |
 | `await h.focusTerm('text', {rows, pad})` | Focuses the terminal row containing `text` (the last such row), plus `rows - 1` rows after it. |
 | `h.unfocus()` | Eases back out to the full frame. |
-| `await h.mark(target, color, pad)` | Draws a box on the page. It is part of the capture and zooms with the content. |
+| `await h.mark(target, color, opts)` | Draws a highlight on the page. It is part of the capture and zooms with the content. `opts` is a padding, or `{pad, shape, glow}`: `shape` is `'rect'` (default), `'circle'` or `'pill'`, and `glow` adds a halo (`'bare'` for the halo alone, no ring). `'circle'` squares the box to its longer side and centres it, so a round target — a graph node — gets a ring rather than an ellipse. |
 | `await h.unmark()` | Fades every mark out. |
 | `await h.termRect(text, opts)` / `await h.editorRect(text, {editor, rows})` | Rectangles around terminal rows or editor lines, fitted to the text. Pass them to `focus` or `mark`. |
 

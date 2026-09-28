@@ -10,6 +10,8 @@ segment's position in the clip (for the cue sheet and the assembler).
   (any factor) plays that segment sped up; "@fit3" plays it in 3 seconds, however long it really
   took (never slower than real time). The assembler tags every sped-up stretch "N×".
 - Trims: project.json "trims": {"segment": seconds} caps a segment's length in the clip.
+- Speeds: project.json "speeds": {"segment": factor} plays a segment faster without cutting anything
+  out of it, which is what a segment containing a move (a zoom easing back out) needs.
 - Frames: Chrome sends one only when the page changes, so each output tick shows the latest frame
   at or before its source time.
 - Zoom: a `focus` event eases the view in on its rectangle (CSS px, scaled by the logged
@@ -123,15 +125,20 @@ def cut(take):
     meta, pos, n_out = [], 0.0, 0
     # project.json "trims": {segment: seconds} caps a segment's length in the clip, dropping the end of
     # its closing hold — for dead air left once the voice-over is laid.
+    # "speeds": {segment: factor} instead plays the whole segment faster, keeping every move in it.
+    # A trim is the right tool for a still hold; on a segment that is easing a zoom back out, it cuts
+    # the move off part-way and the picture jumps to the next beat, so speed that one up instead.
     trims = CFG.get("trims", {})
+    speeds = CFG.get("speeds", {})
     for s in segs:
-        dur = (s["b"] - s["a"]) / s["speed"]
+        speed = s["speed"] * speeds.get(s["name"], 1.0)
+        dur = (s["b"] - s["a"]) / speed
         if s["name"] in trims:
             dur = min(dur, trims[s["name"]])
         n = max(1, round(dur * FPS))
-        meta.append({"segment": s["name"], "start": round(pos, 3), "end": round(pos + n / FPS, 3), "speed": s["speed"]})
+        meta.append({"segment": s["name"], "start": round(pos, 3), "end": round(pos + n / FPS, 3), "speed": speed})
         for i in range(n):
-            t = s["a"] + i / FPS * s["speed"]
+            t = s["a"] + i / FPS * speed
             j = max(0, bisect.bisect_right(times, t) - 1)
             name = frames[j][1]
             if cache["name"] != name:
