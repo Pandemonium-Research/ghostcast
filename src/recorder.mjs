@@ -85,7 +85,15 @@ export async function startCapture(project, page, dir, { quality = 92, everyNthF
 // (VS Code's terminal) ignores synthetic ones.
 export function makeHelpers(project, page, log) {
   const ev = (fn, arg) => page.evaluate(fn, arg);
-  const rectOf = (target, pad) => ev(([t, p]) => window.__rec.rectOf(t, p), [target, pad ?? 6]);
+  // A Playwright locator can't be passed into the page, so it becomes its on-screen rectangle here,
+  // padded the way the page pads an element. Other targets go to the page as they are.
+  const resolve = async (target, pad) => {
+    if (!target || typeof target.boundingBox !== 'function') return target;
+    const b = await target.first().boundingBox({ timeout: 10000 });
+    if (!b) throw new Error('target not visible');
+    return { x: b.x - pad, y: b.y - pad, w: b.width + 2 * pad, h: b.height + 2 * pad };
+  };
+  const rectOf = async (target, pad = 6) => ev(([t, p]) => window.__rec.rectOf(t, p), [await resolve(target, pad), pad]);
   const guarded = new Map();
 
   const h = {
@@ -162,7 +170,8 @@ export function makeHelpers(project, page, log) {
     editorRect: (match, opts = {}) => ev(([m, o]) => window.__rec.editor.rect(m, o), [match, opts]),
 
     // ---- zoom and highlight ----
-    // Zoom (in post) to a rectangle, a CSS selector or text=..., until unfocus(). opts.zoom caps it.
+    // Zoom (in post) to a locator, a rectangle, a CSS selector or text=..., until unfocus().
+    // opts.zoom caps it.
     async focus(target, opts = {}) {
       const r = await rectOf(target);
       h.log('focus', opts.zoom ? { ...r, zoom: opts.zoom } : r);
@@ -172,7 +181,10 @@ export function makeHelpers(project, page, log) {
     unfocus() { h.log('unfocus'); },
     // A box drawn on the page itself (captured, and zoomed with the content).
     // opts: a padding, or {pad, shape: 'rect' | 'circle' | 'pill', glow: true | 'bare'}.
-    mark: (target, color = '#d4380d', opts = 8) => ev(([t, c, o]) => { window.__rec.mark(t, c, o); }, [target, color, opts]),
+    async mark(target, color = '#d4380d', opts = 8) {
+      const t = await resolve(target, typeof opts === 'number' ? opts : opts?.pad ?? 8);
+      await ev(([x, c, o]) => { window.__rec.mark(x, c, o); }, [t, color, opts]);
+    },
     unmark: () => ev(() => window.__rec.unmark()),
     // ---- pointer (the drawn cursor; headless Chrome draws none of its own) ----
     cursor: (on) => ev((o) => (o ? window.__rec.show() : window.__rec.hide()), on),

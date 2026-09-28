@@ -93,7 +93,7 @@ building anything. Then map it:
 
 ## Files
 
-- `project.json`: viewport (`dpr` 1.5 oversamples for sharp zooms), output size and fps,
+- `project.json`: viewport (1440×810 CSS px at `dpr` 2: legible text, oversampled for sharp zooms), output size and fps,
   `capSeconds`, the VS Code URL, zoom limits, caption style, voice-over settings, `trims`.
 - `timeline.json`: takes in order, optionally with a `scene` path, plus `captions`, plus
   `narration` blocks.

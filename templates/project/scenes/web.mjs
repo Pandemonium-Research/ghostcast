@@ -13,7 +13,7 @@ export default async function (h) {
   await h.seg('web_hero', async () => {
     await h.sleep(600);
     // Zoom needs a target narrower than the page: a full-width block has nowhere to zoom to.
-    await h.focus('.hero h1', { zoom: 1.3 });
+    await h.focus(page.getByRole('heading', { level: 1 }), { zoom: 1.3 });
     await h.point(page.getByRole('link', { name: 'Get started' }));
     await h.sleep(1600);
     h.unfocus();

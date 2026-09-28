@@ -12,8 +12,8 @@ export async function teardown(h) { … }   // optional; runs after, even when t
 Only what happens inside `h.seg(...)` reaches the video. Everything between segments is cut, so a
 scene can do off-camera work, such as opening a file or changing the layout, between two segments.
 
-Positions and rectangles are in CSS pixels of the viewport. With `viewport.dpr` 1.5, the capture
-is 1.5× that and zooms up to 1.5× stay sharp.
+Positions and rectangles are in CSS pixels of the viewport (1440×810 by default). With `viewport.dpr` 2,
+the capture is 2× that and zooms up to 2× stay sharp.
 
 ## Segments
 
@@ -45,7 +45,7 @@ Name segments `<take>_<beat>`: captions and voice-over pieces refer to them by n
 
 | Call | What it does |
 |---|---|
-| `await h.focus(target, {zoom})` | From now on the view eases in on the target (applied in post). `zoom` caps the magnification. Returns the rectangle. |
+| `await h.focus(target, {zoom})` | From now on the view eases in on the target (applied in post): a locator, a CSS selector, `text=…` or a rectangle, as for `h.mark`. `zoom` caps the magnification. Returns the rectangle. |
 | `await h.focusTerm('text', {rows, pad})` | Focuses the terminal row containing `text` (the last such row), plus `rows - 1` rows after it. |
 | `h.unfocus()` | Eases back out to the full frame. |
 | `await h.mark(target, color, opts)` | Draws a highlight on the page. It is part of the capture and zooms with the content. `opts` is a padding, or `{pad, shape, glow}`: `shape` is `'rect'` (default), `'circle'` or `'pill'`, and `glow` adds a halo (`'bare'` for the halo alone, no ring). `'circle'` squares the box to its longer side and centres it, so a round target — a graph node — gets a ring rather than an ellipse. |
