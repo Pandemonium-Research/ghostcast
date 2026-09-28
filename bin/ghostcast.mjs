@@ -18,7 +18,7 @@ const PY = path.join(PKG, 'py');
 const HELP = `ghostcast — a recording studio for coding agents
 
   ghostcast init <dir>                  new project from the template
-  ghostcast doctor                      check Chrome, ffmpeg, Python + Pillow, editor tools
+  ghostcast doctor                      check Chrome, ffmpeg and editor tools
   ghostcast vscode [--port 8765] --accept-server-license-terms
                                         serve VS Code in the browser for editor scenes
                                         (runs until stopped; start it in the background, and
@@ -45,13 +45,14 @@ const die = (msg) => { console.error(msg); process.exit(1); };
 const projectDir = path.resolve(opt('--project', process.cwd()));
 const cmd = argv.shift();
 
-function python() {
+function optionalPython() {
   if (process.env.GHOSTCAST_PYTHON) return process.env.GHOSTCAST_PYTHON;
   for (const p of process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python']) {
     if (spawnSync(p, ['--version'], { stdio: 'ignore' }).status === 0) return p;
   }
-  die('no Python found (set GHOSTCAST_PYTHON)');
+  return null;
 }
+function python() { return optionalPython() || die('no Python found (set GHOSTCAST_PYTHON); vo-script, pauses and vo-mix still use Python'); }
 
 function py(script, args) {
   const r = spawnSync(python(), [path.join(PY, script), ...args], {
@@ -199,9 +200,12 @@ const commands = {
     check('Google Chrome', chrome.find((c) => fs.existsSync(c)), 'install Chrome, or set browser.channel in project.json (e.g. "msedge"), or run `npx playwright install chromium` and set it to "chromium"');
     check('ffmpeg', which('ffmpeg'), 'install ffmpeg and put it on PATH');
     check('ffprobe', which('ffprobe'), 'comes with ffmpeg');
-    const p = python();
-    const pil = spawnSync(p, ['-c', 'import PIL; print(PIL.__version__)'], { encoding: 'utf8' });
-    check(`Python + Pillow (${p})`, pil.status === 0 && `Pillow ${pil.stdout.trim()}`, `${p} -m pip install pillow`);
+    const p = optionalPython();
+    console.log(`info  Python for vo-script, pauses and vo-mix: ${p || 'not found (set GHOSTCAST_PYTHON to use those commands)'}`);
+    if (p) {
+      const pil = spawnSync(p, ['-c', 'import PIL; print(PIL.__version__)'], { encoding: 'utf8' });
+      console.log(`info  Pillow for Python review.py: ${pil.status === 0 ? pil.stdout.trim() : 'not found (ghostcast review uses its Node fallback)'}`);
+    }
     check('VS Code CLI (only for editor scenes)', which('code'), 'install VS Code and its `code` command');
     if (process.platform === 'win32') check('Git Bash (terminal scenes on Windows)', gitBash(), 'install Git for Windows');
     const cli = vscodeCliDir();
@@ -249,9 +253,13 @@ const commands = {
     process.exit(ok ? 0 : 1);
   },
 
-  cut() { process.exit(argv.length ? py('cut.py', argv) : die('usage: ghostcast cut <take> [...]')); },
-  assemble() { process.exit(py('assemble.py', argv)); },
-  review() { process.exit(py('review.py', argv)); },
+  async cut() { if (!argv.length) die('usage: ghostcast cut <take> [...]'); const { cut } = await import('../src/post/render.mjs'); for (const take of argv) await cut(projectDir, take); },
+  async assemble() { const { assemble } = await import('../src/post/render.mjs'); await assemble(projectDir); },
+  async review() {
+    const p = optionalPython();
+    if (p && spawnSync(p, ['-c', 'import PIL'], { stdio: 'ignore' }).status === 0) { process.exit(py('review.py', argv)); }
+    const { review } = await import('../src/post/review.mjs'); await review(projectDir, argv);
+  },
   'vo-script'() { process.exit(py('vo_script.py', argv)); },
   pauses() { process.exit(py('pauses.py', argv)); },
   'vo-mix'() { process.exit(py('vo_mix.py', argv)); },
@@ -268,9 +276,9 @@ const commands = {
         if (!ok) console.log(`${take}: take failed (attempt ${attempt})`);
       }
       // A failed take leaves partial footage in raw/; it is never cut as if it were a good one.
-      if (ok) { if (py('cut.py', [take]) !== 0) failed.push(take); } else { console.log(`${take}: NOT CUT (failed twice); see \`ghostcast review ${take} --raw\``); failed.push(take); }
+      if (ok) { try { const { cut } = await import('../src/post/render.mjs'); await cut(projectDir, take); } catch (e) { console.error(e); failed.push(take); } } else { console.log(`${take}: NOT CUT (failed twice); see \`ghostcast review ${take} --raw\``); failed.push(take); }
     }
-    const code = py('assemble.py', []);
+    let code = 0; try { const { assemble } = await import('../src/post/render.mjs'); await assemble(projectDir); } catch (e) { console.error(e); code = 1; }
     if (failed.length) die(`failed: ${failed.join(', ')}`);
     process.exit(code);
   },

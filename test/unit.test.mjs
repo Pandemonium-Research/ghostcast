@@ -1,6 +1,5 @@
 // Unit tests: the post-production functions against the shared vectors in test/vectors/.
-// Today they run against the Python code (test/py/); the Node port in PLAN.md stage 1 must pass the
-// same vectors before the Python is removed.
+// The remaining Python tools (voice-over placement and pause detection) use their shared vectors.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -15,7 +14,7 @@ function python() {
   return names.find((p) => spawnSync(p, ['--version'], { stdio: 'ignore' }).status === 0) || 'python3';
 }
 
-test('post-production matches test/vectors (Python)', () => {
+test('remaining Python tools match test/vectors', () => {
   const r = spawnSync(python(), ['-m', 'unittest', 'discover', '-s', 'test/py', '-t', 'test/py'],
     { cwd: REPO, encoding: 'utf8' });
   assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);

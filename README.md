@@ -3,7 +3,7 @@
 *Screencasts with nobody at the keyboard.* ghostcast films real software in the background
 (terminals, editors and web apps) while your agent directs.
 
-> **Status: 0.1, the recording engine.** Everything below works today. [VISION.md](VISION.md)
+> **Status: 0.1, with Node cut and assembly.** Everything below works today. [VISION.md](VISION.md)
 > describes the product being built on it, and [PLAN.md](PLAN.md) the stages toward version 1.
 
 An agent writes a scene per shot: open a clean terminal on a project, type a command, zoom onto the line
@@ -26,9 +26,9 @@ that vanish, terminals that ignore synthetic input. ghostcast handles them, and
 
 ```
 scene.mjs ──record──▶ raw/<take>/ frames + event log
-                         │ cut: keep segments, speed up @fitN waits, ease zooms
+                         │ cut: render cached beats with zooms, captions and speed tags
                          ▼
-                      clips/<take>.mp4 ──assemble: captions, N× tags, cap check──▶ out/<name>-silent.mp4
+                      clips/<take>.mp4 ──assemble: stream copy, cap check────────▶ out/<name>-silent.mp4
                                                                                    │ + cue sheet
                       voiceover/*.m4a + plan.json ──vo-mix: place, fade, −16 LUFS──▶ out/<name>.mp4
 ```
@@ -67,7 +67,8 @@ Requirements:
 
 - Node 20+ and Google Chrome (or Edge, via `browser.channel`).
 - ffmpeg on `PATH`.
-- Python 3 with Pillow.
+- Python 3 for the remaining voice-over commands (`vo-script`, `pauses`, `vo-mix`). Pillow is
+  needed only to run `py/review.py` directly; `ghostcast review` has a Node fallback.
 - On Windows, Git Bash for terminal scenes; on macOS and Linux, `/bin/bash`.
 - The `code` CLI only for editor scenes.
 
@@ -100,9 +101,9 @@ nothing faked, no personal data, ask before costly or outward-facing steps). The
 | `ghostcast doctor` | Check the toolchain |
 | `ghostcast vscode [--port]` | Serve VS Code for editor scenes, with its settings and clean shell |
 | `ghostcast record <take> [--headed]` | Run a scene and capture it |
-| `ghostcast cut <take…>` | Frames → clip: segments, speed, zoom |
+| `ghostcast cut <take…>` | Frames → cached beats and captioned clip: segments, speed, zoom |
 | `ghostcast all [take…]` | Record + cut (one retry per take), then assemble |
-| `ghostcast assemble` | Clips + captions → silent cut + cue sheet |
+| `ghostcast assemble` | Cached beats → silent cut by stream copy + cue sheet |
 | `ghostcast review <take\|final> [--raw] [--at s]` | Contact sheets and stills |
 | `ghostcast vo-script` | Narration timed against the cut, with fit warnings |
 | `ghostcast pauses <audio…>` | Where to split voice-over clips |
@@ -148,8 +149,10 @@ Planned for version 1 ([PLAN.md](PLAN.md)):
 
 ## Status
 
-Version 0.1, tested on Windows 11 with Chrome, VS Code 1.138, ffmpeg 8 and Python 3.14. The code
-paths for macOS and Linux exist (Chrome channel, bash profile, fonts) but are untested.
+Version 0.1, with `cut` and `assemble` ported to Node. Beats are rendered once and cached under
+`cache/beats/`; assembly joins those beats without re-encoding. The Node post-production path is
+tested on Windows 11 with Chrome and ffmpeg 8. The remaining voice commands use Python 3.14.
+macOS and Linux have not been verified.
 
 `npm test` runs the unit tests and an end-to-end smoke test; see [`test/README.md`](test/README.md).
 

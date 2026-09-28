@@ -12,7 +12,7 @@ as work lands.
 | Stage | Name | Depends on | Status |
 |---|---|---|---|
 | 0 | [Groundwork](#stage-0--groundwork) | — | Done: see [docs/bakeoff.md](docs/bakeoff.md) |
-| 1 | [One-command install](#stage-1--one-command-install) | 0 | Not started |
+| 1 | [One-command install](#stage-1--one-command-install) | 0 | In progress: Node post-production done |
 | 2 | [Isolation](#stage-2--isolation) | 1 | Not started |
 | 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Not started |
 | 4 | [Plan](#stage-4--plan) | 2 | Not started |
@@ -159,6 +159,24 @@ Build:
 - **Speed and footprint:** the new post-production runs at low priority, and aims for at most
   0.5 s of work per second of output. The 0.1 baseline is 1.6–2.7 s for cutting, and assembling
   averages 70% of a 16-thread machine.
+
+Progress (Windows; measured on the bake-off takes at a true 2880×1620):
+
+- **Done:**
+  - the lightweight terminal, `h.terminal.open` (xterm.js on a real shell through node-pty);
+  - capture at the device scale, so frames really are 2× (they never were before);
+  - the compositor decision: ffmpeg's `perspective` filter (docs/compositor-spike.md);
+  - `cut` and `assemble` in Node, per beat and cached. Each beat is one ffmpeg run (perspective,
+    Lanczos scale, captions and `N×` tag, x264 `veryfast` CRF 16) below normal priority; repeated
+    frames are warped once; full-frame stretches skip the warp; beats render one at a time
+    (`GHOSTCAST_JOBS` for more); assembly joins beats by stream copy.
+- **Measured** (best of three, cold cache): registry 0.47 s and validate 0.36 s per output
+  second, against Pillow's 4.5 and 3.0. SSIM against the Pillow reference: mean 0.9975 and
+  0.9987, minimum 0.9937 and 0.9942. Peak 760 MiB per ffmpeg. The zoom expression grows
+  linearly: 33,633 characters for 50 camera moves (review caught an exponential first version
+  that failed past 12). The full suite runs in 82 s instead of 178 s.
+- **Left:** the voice commands and `review` in Node, then Python removed; a clean `npx` install;
+  macOS and Linux.
 
 Decide:
 

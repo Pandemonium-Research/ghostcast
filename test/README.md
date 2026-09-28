@@ -2,7 +2,7 @@
 
 ```bash
 npm test             # everything (about a minute and a half)
-npm run test:unit    # the post-production functions only (under a second)
+npm run test:unit    # Node post functions and the remaining Python functions
 npm run test:smoke   # the end-to-end run only
 ```
 
@@ -19,22 +19,22 @@ expected outputs, worked out from the rules rather than copied from the code. Th
 
 `config.json` is the project configuration the vectors assume.
 
-Today the vectors run against the Python code (`py/test_*.py`, run by `unit.test.mjs`). When
-post-production moves to Node ([PLAN.md](../PLAN.md), stage 1), the Node code must pass the same
-vectors before the Python is removed. Add a case here whenever a rule changes or a bug is fixed.
+`post.test.mjs` runs the unchanged `cut.json` and `assemble.json` vectors against Node and checks
+that a caption edit invalidates only its covered beat. `unit.test.mjs` runs the voice-over and
+pause vectors against the remaining Python code. Add a case here whenever a rule changes or a bug
+is fixed.
 
 ## Smoke test
 
 `smoke.test.mjs` makes a project from the template in the system temp directory, then runs the
 CLI end to end:
 
-1. record, cut and assemble the title and web takes;
+1. record, cut and assemble the title, terminal and web takes;
 2. review the cut;
 3. time the narration;
 4. find the pauses in a generated stand-in clip;
 5. mix a voice-over, checking its loudness independently (−16 LUFS ± 1);
 6. record a take that fails on purpose, checking it leaves a screenshot.
 
-It needs what `ghostcast doctor` checks, except VS Code: the template's terminal take is left
-out, because serving VS Code means accepting its license. The project is deleted afterwards,
-unless a step failed; then its path is printed so you can look at what it produced.
+It needs Chrome and ffmpeg, plus Python for the remaining voice commands. The project is deleted
+afterwards unless a step failed; then its path is printed for inspection.

@@ -2,6 +2,7 @@
 raw/
 clips/
 out/
+cache/
 chrome-profile/
 
 # VS Code server state, and its access token.
