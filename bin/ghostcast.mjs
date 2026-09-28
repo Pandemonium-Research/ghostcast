@@ -5,9 +5,11 @@ import { spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gitBash } from '../src/shell.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = path.resolve(HERE, '..');
@@ -16,9 +18,9 @@ const PY = path.join(PKG, 'py');
 const HELP = `ghostcast — a recording studio for coding agents
 
   ghostcast init <dir>                  new project from the template
-  ghostcast doctor                      check Chrome, ffmpeg, Python + Pillow, VS Code
+  ghostcast doctor                      check Chrome, ffmpeg, Python + Pillow, editor tools
   ghostcast vscode [--port 8765] --accept-server-license-terms
-                                        serve VS Code in the browser for terminal/editor scenes
+                                        serve VS Code in the browser for editor scenes
                                         (runs until stopped; start it in the background, and
                                         record once it prints "VS Code is ready")
 
@@ -144,15 +146,6 @@ async function announceReady(port, token, server) {
   }
 }
 
-function gitBash() {
-  const candidates = [
-    'C:\\Program Files\\Git\\bin\\bash.exe',
-    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
-    path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Git', 'bin', 'bash.exe'),
-  ];
-  return candidates.find((c) => fs.existsSync(c)) || null;
-}
-
 // The workbench reads user settings from the browser's storage, not from disk; settings on disk
 // reach it only at machine scope. The project's settings are written there, with a terminal
 // profile that starts bash on the project's clean rc file.
@@ -186,13 +179,18 @@ const commands = {
     console.log(`project at ${dir}\nnext: edit timeline.json and scenes/, then \`ghostcast record <take>\` from there (or pass --project).`);
   },
 
-  doctor() {
+  async doctor() {
     let bad = 0;
     const check = (name, ok, hint) => { console.log(`${ok ? 'ok  ' : 'MISS'}  ${name}${ok && typeof ok === 'string' ? `  (${ok})` : ''}${ok ? '' : `  — ${hint}`}`); if (!ok) bad++; };
-    check('node >= 18', Number(process.versions.node.split('.')[0]) >= 18 && process.version, 'install Node 18+');
+    check('node >= 20', Number(process.versions.node.split('.')[0]) >= 20 && process.version, 'install Node 20+ (Playwright needs it)');
+    // Dependencies are found the way Node finds them, wherever npm put them (npx hoists them).
+    const need = createRequire(import.meta.url);
     let pw = null;
-    try { pw = JSON.parse(fs.readFileSync(path.join(PKG, 'node_modules', 'playwright', 'package.json'), 'utf8')).version; } catch {}
+    try { pw = JSON.parse(fs.readFileSync(need.resolve('playwright/package.json'), 'utf8')).version; } catch {}
     check('playwright', pw, 'npm install (in the ghostcast package)');
+    let pty = null;
+    try { await import('@lydell/node-pty'); pty = `${process.platform}-${process.arch}`; } catch {}
+    check('terminal pty (prebuilt)', pty, 'no prebuilt pty for this platform: terminal scenes need Windows, macOS or glibc Linux, on x64 or ARM64');
     const chrome = {
       win32: ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'Application', 'chrome.exe')],
       darwin: ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'],
@@ -204,7 +202,7 @@ const commands = {
     const p = python();
     const pil = spawnSync(p, ['-c', 'import PIL; print(PIL.__version__)'], { encoding: 'utf8' });
     check(`Python + Pillow (${p})`, pil.status === 0 && `Pillow ${pil.stdout.trim()}`, `${p} -m pip install pillow`);
-    check('VS Code CLI (only for terminal/editor scenes)', which('code'), 'install VS Code and its `code` command');
+    check('VS Code CLI (only for editor scenes)', which('code'), 'install VS Code and its `code` command');
     if (process.platform === 'win32') check('Git Bash (terminal scenes on Windows)', gitBash(), 'install Git for Windows');
     const cli = vscodeCliDir();
     let builds = [];

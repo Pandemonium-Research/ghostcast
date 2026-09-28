@@ -1,12 +1,11 @@
-// Terminal take: VS Code in the browser (start it first: ghostcast vscode --accept-server-license-terms),
-// opened on the project's workspace/ folder, with a clean shell (vscode/shell.bashrc).
+// Terminal take: a lightweight xterm page backed by bash, opened on the project's workspace/
+// folder with the clean shell (vscode/shell.bashrc). No VS Code server is needed.
 //
 // h.run types a command at a human pace, checks it reached the terminal, presses Enter, and waits
 // for the `$` prompt to come back. h.focusTerm zooms (in post) onto the row that contains a string.
 
 export async function setup(h) {
-  // sidebar: false gives the terminal the full width; the panel is maximized by default.
-  await h.vscode.open('workspace', { sidebar: false });
+  await h.terminal.open('workspace');
 }
 
 export default async function (h) {

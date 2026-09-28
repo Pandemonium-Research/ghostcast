@@ -6,7 +6,7 @@
 > **Status: 0.1, the recording engine.** Everything below works today. [VISION.md](VISION.md)
 > describes the product being built on it, and [PLAN.md](PLAN.md) the stages toward version 1.
 
-An agent writes a scene per shot: open VS Code on a project, type a command, zoom onto the line
+An agent writes a scene per shot: open a clean terminal on a project, type a command, zoom onto the line
 that answers it. ghostcast plays the scene in an off-screen Chrome and keeps every frame, so
 nothing on your screen is recorded and nothing on it gets in the way. The frames become a
 finished video:
@@ -40,7 +40,8 @@ speech; some draw terminals instead of filming them, or rebuild the product's UI
 ghostcast is for videos of software as it really runs.
 
 - **Real terminals, a real editor, real web apps, filmed as pixels.**
-  - VS Code runs in the browser (`code serve-web`) with a clean shell.
+  - Terminal scenes use a local xterm page with a clean, real shell. Editor scenes can use VS Code
+    in the browser (`code serve-web`).
   - Commands are typed at a human pace, checked on screen before Enter, and waited on until the
     prompt returns.
   - Agent CLIs (Claude Code, Codex) can run on camera.
@@ -64,26 +65,25 @@ ghostcast is for videos of software as it really runs.
 
 Requirements:
 
-- Node 18+ and Google Chrome (or Edge, via `browser.channel`).
+- Node 20+ and Google Chrome (or Edge, via `browser.channel`).
 - ffmpeg on `PATH`.
 - Python 3 with Pillow.
-- The `code` CLI, for terminal and editor scenes.
-- On Windows, Git Bash.
+- On Windows, Git Bash for terminal scenes; on macOS and Linux, `/bin/bash`.
+- The `code` CLI only for editor scenes.
 
 ```bash
 git clone <this repo> ghostcast && cd ghostcast
-npm install                       # Playwright only; it uses your installed Chrome
+npm install                       # Playwright, xterm and a prebuilt pty; uses your installed Chrome
 node bin/ghostcast.mjs doctor
 node bin/ghostcast.mjs init ../my-demo && cd ../my-demo
-
-# Terminal/editor takes need VS Code served (read the license first; this flag accepts it).
-# The first time, it downloads the VS Code server (about 600 MB, once per machine); wait for
-# "VS Code is ready" before recording.
-node ../ghostcast/bin/ghostcast.mjs vscode --accept-server-license-terms &
 
 node ../ghostcast/bin/ghostcast.mjs all          # record + cut every take, then assemble
 node ../ghostcast/bin/ghostcast.mjs review final # contact sheet in out/review/final.png
 ```
+
+Only editor scenes need `ghostcast vscode --accept-server-license-terms`. Read the VS Code Server
+license before using that command. Its first run downloads the server; wait for "VS Code is ready"
+before recording an editor scene.
 
 The template records a title card, a terminal take and a web take (about 30 s). For convenience,
 `npm link` puts `ghostcast` on your `PATH`.
@@ -98,7 +98,7 @@ nothing faked, no personal data, ask before costly or outward-facing steps). The
 |---|---|
 | `ghostcast init <dir>` | New project from the template |
 | `ghostcast doctor` | Check the toolchain |
-| `ghostcast vscode [--port]` | Serve VS Code for the project, with its settings and clean shell |
+| `ghostcast vscode [--port]` | Serve VS Code for editor scenes, with its settings and clean shell |
 | `ghostcast record <take> [--headed]` | Run a scene and capture it |
 | `ghostcast cut <take…>` | Frames → clip: segments, speed, zoom |
 | `ghostcast all [take…]` | Record + cut (one retry per take), then assemble |
@@ -113,7 +113,7 @@ nothing faked, no personal data, ask before costly or outward-facing steps). The
 ```js
 // scenes/build.mjs
 export async function setup(h) {
-  await h.vscode.open('/path/to/project', { sidebar: false });
+  await h.terminal.open('/path/to/project');
 }
 
 export default async function (h) {

@@ -1,8 +1,8 @@
 // Smoke test: a fresh project from the template, recorded headlessly, cut, assembled, voiced and
 // reviewed, end to end through the CLI. A failing take is checked too.
 //
-// Needs what `ghostcast doctor` checks, except VS Code: the template's terminal take is left out,
-// because serving VS Code means accepting its license. The project is made in the system temp
+// Needs what `ghostcast doctor` checks except VS Code, which only editor scenes use: the template's
+// terminal take runs in ghostcast's own terminal page. The project is made in the system temp
 // directory and removed afterwards, unless a step failed (then its path is printed).
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,24 +42,22 @@ after(() => {
 
 step('init makes a project from the template', () => {
   ok(gc('init', dir), 'init');
-  const tl = json('timeline.json');
-  tl.items = tl.items.filter((i) => i.take !== 'terminal');
-  tl.narration = tl.narration.filter((b) => !b.takes.includes('terminal'));
-  fs.writeFileSync(file('timeline.json'), JSON.stringify(tl, null, 2));
 });
 
-step('all records, cuts and assembles the title and web takes', () => {
+step('all records, cuts and assembles every template take', () => {
   ok(gc('all'), 'all');
   const segments = (take) => json(`clips/${take}.json`).segments.map((s) => s.segment);
   assert.deepEqual(segments('title'), ['title_card']);
+  assert.deepEqual(segments('terminal'), ['terminal_list', 'terminal_count', 'terminal_wait@fit2']);
   assert.deepEqual(segments('web'), ['web_hero', 'web_install']);
 
-  const clips = json('clips/title.json').duration + json('clips/web.json').duration;
+  const clips = ['title', 'terminal', 'web'].reduce((sum, take) => sum + json(`clips/${take}.json`).duration, 0);
   const info = probe('out/smoke-silent.mp4', 'stream=width,height,r_frame_rate:format=duration');
   assert.deepEqual([info.streams[0].width, info.streams[0].height, info.streams[0].r_frame_rate], [1920, 1080, '30/1']);
   const length = Number(info.format.duration);
   assert.ok(Math.abs(length - clips) < 0.15, `silent cut is ${length}s; its clips add up to ${clips}s`);
   assert.match(read('out/smoke.cues.md'), /web · web_install/);
+  assert.match(read('out/smoke.cues.md'), /terminal · terminal_count/);
 });
 
 step('review writes a contact sheet of the cut', () => {
@@ -116,6 +114,7 @@ step('vo-mix lays the voice on its beats at broadcast loudness', () => {
 
 step('a failing take leaves a screenshot and is reviewable', () => {
   fs.writeFileSync(file('scenes/broken.mjs'), [
+    "export async function setup(h) { await h.terminal.open('workspace'); }",
     'export default async function (h) {',
     "  await h.seg('broken_start', async () => {",
     '    await h.sleep(300);',

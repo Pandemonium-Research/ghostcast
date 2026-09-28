@@ -55,10 +55,11 @@ Name segments `<take>_<beat>`: captions and voice-over pieces refer to them by n
 A target narrower than the frame is needed for any zoom: a full-width block has nowhere to zoom
 to. Focus the heading, the line, or the row.
 
-## Terminal (VS Code in the browser)
+## Terminal
 
 | Call | What it does |
 |---|---|
+| `await h.terminal.open(folder, {fontSize, padding})` | Opens a local xterm page on a real bash shell in `folder` (relative to the project, or absolute). Uses `vscode/shell.bashrc`, fills the viewport, and waits for the `$` prompt. Default font size is 24 px (about 90 columns) with 30 px padding; the pointer is hidden. No VS Code server or port is needed. |
 | `await h.vscode.open(folder, {sidebar, maximize})` | Loads VS Code on a folder (relative to the project, or absolute) and gives it a fresh, cleared terminal. `sidebar: false` hides both side bars. The panel is maximized by default. |
 | `await h.run(cmd, {cps, after, timeout, ps})` | Types the command and checks it reached the terminal (fails the take if not), then presses Enter and waits for the bare `$` prompt. `timeout` is in ms (default 60 000). |
 | `await h.waitFor(/regex/, timeout)` | Waits until the terminal's text matches, e.g. for a TUI (an agent CLI) that has no `$` prompt. |

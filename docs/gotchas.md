@@ -12,7 +12,7 @@ check first.
   - the driver keeps a 2 px *heartbeat* pixel alternating between two colours one step apart.
     The change has to be real, or no frame is sent.
 
-  If a page reloads mid-take, the heartbeat must restart. `h.goto` and `h.vscode.open` do this;
+  If a page reloads mid-take, the heartbeat must restart. `h.goto`, `h.terminal.open`, and `h.vscode.open` do this;
   a bare `h.page.goto` does not.
 - **The driver must be injected after navigation.** As an init script, it runs before
   `document.documentElement` exists. `h.goto` injects it; after any other navigation, call
@@ -33,6 +33,19 @@ check first.
   default). `zoom.max` defaults to the larger of 1.5 and dpr.
 - **Terminal rows and editor lines span the full width.** Their rectangles are therefore taken
   from the characters themselves (a DOM Range), first to last non-blank.
+
+## Lightweight terminal (`h.terminal.open`)
+
+- **It needs bash.** On Windows, install Git Bash. On macOS and Linux, `/bin/bash` must exist.
+  The shell starts in the requested folder with the project's `vscode/shell.bashrc`, and the
+  inherited agent variables that rc file unsets are removed before bash starts.
+- **The pty is prebuilt only.** `@lydell/node-pty` provides Windows, macOS and Linux binaries for
+  x64 and ARM64 (glibc Linux; not musl, e.g. Alpine). It does not fall back to a local compiler.
+- **Keep the DOM rows.** The page loads `@xterm/xterm` from the installed package with its default
+  DOM renderer. Canvas and WebGL addons make `.xterm-rows` unreadable to `h.run`, `h.prompt`,
+  and `h.termRect`.
+- **The shell belongs to the take.** It is killed when the take ends, including after a scene
+  failure. Open a fresh terminal in the next take's setup.
 
 ## VS Code in the browser (`code serve-web`)
 

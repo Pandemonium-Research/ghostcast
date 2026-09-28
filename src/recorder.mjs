@@ -13,11 +13,17 @@
 //   log.json            [[epoch_ms, label, data?], ...]: +name/-name segments, focus/unfocus, viewport
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import pty from '@lydell/node-pty';
+import { gitBash } from './shell.mjs';
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 const DRIVER = fs.readFileSync(path.join(SRC, 'driver.js'), 'utf8');
+// xterm is found the way Node finds any dependency, so it loads wherever npm put it: an install
+// through npx or as a dependency hoists it out of ghostcast's own folder.
+const XTERM = path.resolve(path.dirname(createRequire(import.meta.url).resolve('@xterm/xterm')), '..');
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const jitter = (ms) => ms * (0.55 + Math.random() * 0.9);
@@ -95,6 +101,19 @@ export function makeHelpers(project, page, log) {
   };
   const rectOf = async (target, pad = 6) => ev(([t, p]) => window.__rec.rectOf(t, p), [await resolve(target, pad), pad]);
   const guarded = new Map();
+  let terminalPty = null;
+  let terminalData = null;
+  let terminalOutput = Promise.resolve();
+  let terminalBindings = false;
+
+  const closeTerminal = () => {
+    terminalData?.dispose();
+    terminalData = null;
+    if (terminalPty) {
+      try { terminalPty.kill(); } catch {}
+      terminalPty = null;
+    }
+  };
 
   const h = {
     page, project, config: project.config, sleep,
@@ -223,6 +242,7 @@ export function makeHelpers(project, page, log) {
       for (const f of files.flat().map((x) => path.resolve(project.root, x))) if (!guarded.has(f)) guarded.set(f, fs.readFileSync(f));
     },
     restoreFiles() { for (const [f, b] of guarded) fs.writeFileSync(f, b); },
+    closeTerminal,
     // Replace exact strings in a file, keeping its line endings.
     editFile(rel, pairs) {
       const file = path.resolve(project.root, rel);
@@ -238,6 +258,65 @@ export function makeHelpers(project, page, log) {
     },
   };
   h.vscode = vscodeHelpers(h);
+  h.terminal = {
+    async open(folder, { fontSize = 24, padding = 30 } = {}) {
+      closeTerminal();
+      const cwd = path.resolve(project.root, folder);
+      if (!fs.statSync(cwd).isDirectory()) throw new Error(`terminal.open: not a folder: ${cwd}`);
+      const rc = path.join(project.root, 'vscode', 'shell.bashrc');
+      if (!fs.existsSync(rc)) throw new Error(`terminal.open: missing ${rc}`);
+      const shell = process.platform === 'win32' ? gitBash() : '/bin/bash';
+      if (!shell || !fs.existsSync(shell)) throw new Error('terminal.open: bash not found (install Git Bash on Windows)');
+      if (!terminalBindings) {
+        await page.exposeBinding('__ghostcastTerminalInput', (_, data) => terminalPty?.write(data));
+        terminalBindings = true;
+      }
+      await page.setContent('<!doctype html><html><head><meta charset="utf-8"></head><body><main id="terminal"></main></body></html>');
+      await page.addStyleTag({ path: path.join(XTERM, 'css', 'xterm.css') });
+      await page.addStyleTag({ content: `
+        html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #fff; }
+        #terminal { box-sizing: border-box; width: 100vw; height: 100vh; padding: ${padding}px; }
+        .xterm { height: 100%; }
+      ` });
+      await page.addScriptTag({ path: path.join(XTERM, 'lib', 'xterm.js') });
+      const size = await page.evaluate(({ fontSize }) => {
+        const host = document.getElementById('terminal');
+        const probe = document.createElement('span');
+        probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${fontSize}px 'Cascadia Mono',Consolas,Menlo,'DejaVu Sans Mono',monospace;`;
+        probe.textContent = 'W'.repeat(100);
+        host.appendChild(probe);
+        const cellWidth = probe.getBoundingClientRect().width / 100;
+        const cellHeight = fontSize * 1.25;
+        probe.remove();
+        const style = getComputedStyle(host);
+        const cols = Math.max(2, Math.floor((host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)) / cellWidth));
+        const rows = Math.max(2, Math.floor((host.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)) / cellHeight));
+        const term = new Terminal({
+          cols, rows, fontSize, lineHeight: 1.25,
+          fontFamily: "'Cascadia Mono', Consolas, Menlo, 'DejaVu Sans Mono', monospace",
+          cursorBlink: false, scrollback: 1000,
+          theme: { background: '#ffffff', foreground: '#24292f', cursor: '#555555', selectionBackground: '#c8ddf5' },
+        });
+        term.open(host);
+        term.onData((data) => window.__ghostcastTerminalInput(data));
+        term.focus();
+        window.__ghostcastTerminal = term;
+        return { cols, rows };
+      }, { fontSize });
+      const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+        !/^(CLAUDE|ANTHROPIC|OPENAI|CODEX)/.test(key) && key !== 'PROMPT_COMMAND'));
+      env.TERM = 'xterm-256color';
+      terminalPty = pty.spawn(shell, ['--rcfile', rc.replace(/\\/g, '/'), '-i'], {
+        name: 'xterm-256color', cols: size.cols, rows: size.rows, cwd, env,
+      });
+      terminalData = terminalPty.onData((data) => {
+        terminalOutput = terminalOutput.then(() => page.evaluate((chunk) => window.__ghostcastTerminal?.write(chunk), data)).catch(() => {});
+      });
+      await inject(page, { cursor: false });   // a terminal take has no use for a pointer
+      await page.evaluate(() => window.__rec.heartbeat(true));
+      await h.prompt({ timeout: 30000 });
+    },
+  };
   return h;
 }
 
@@ -417,6 +496,7 @@ export async function record(project, sceneFile, take, { headed = false } = {}) 
       console.log(`${take}: ${frames} frames, ${segs} segments${ok ? '' : ' (scene failed)'} -> ${dir}`);
     }
   } finally {
+    h.closeTerminal();
     h.restoreFiles();
     if (scene.teardown) await scene.teardown(h).catch((e) => console.error('teardown:', e.message));
     await ctx.close();

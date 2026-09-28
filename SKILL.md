@@ -30,12 +30,14 @@ building anything. Then map it:
 
 1. **Set up.**
    - `npm install` in this package, then `ghostcast doctor`. It checks Chrome, ffmpeg, Python and
-     Pillow, and the VS Code CLI.
+     Pillow, and the VS Code CLI for editor scenes.
    - `ghostcast init <dir>` makes a project from the template: three sample takes (title card,
      terminal, web page) you can record straight away to check the machine.
-   - For terminal or editor takes, VS Code must be served:
+   - For editor takes, VS Code must be served:
      `ghostcast vscode --accept-server-license-terms`. Run it in the background. **Ask the user
      before passing that flag.** It accepts the VS Code Server license on their behalf.
+   - Terminal takes use `h.terminal.open('workspace')` in scene setup. They need bash (Git Bash
+     on Windows) and do not need VS Code or its server license.
 2. **Prepare the world the demo happens in.**
    - Use real projects with real names, in ordinary places. Don't use `demo/` or `test123`.
    - Use a clean shell: `vscode/shell.bashrc` has a `$` prompt, no history and no personal

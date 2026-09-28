@@ -20,9 +20,11 @@
     "test:smoke": "node --test test/smoke.test.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
+    "@lydell/node-pty": "1.2.0-beta.14",
+    "@xterm/xterm": "^6.0.0",
     "playwright": "^1.63.0"
   },
   "keywords": [
