@@ -101,8 +101,8 @@ npx ghostcast init                # adds .ghostcast/: product.md, brief.md, worl
 npx ghostcast next                # where the video stands, and the one next action
 npx ghostcast template how-to     # a storyboard skeleton: launch, how-to, feature or receipt
 npx ghostcast lint                # one claim per beat, word budgets, panel share, the cap
-npx ghostcast approve storyboard  # after the user has approved it
 npx ghostcast rehearse            # every beat three times, without filming; flaky beats reported
+npx ghostcast approve storyboard  # after the user has approved the rehearsed plan
 npx ghostcast all                 # film the storyboard, cut and assemble
 npx ghostcast review final        # contact sheet in .ghostcast/out/review/final.png
 ```
