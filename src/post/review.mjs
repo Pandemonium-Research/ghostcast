@@ -6,6 +6,14 @@ import { ffmpeg } from './render.mjs';
 
 const json = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const exists = (p) => fs.existsSync(p);
+const roundEven = (x) => { const n = Math.floor(x), part = x - n; return part < .5 ? n : part > .5 ? n + 1 : n % 2 === 0 ? n : n + 1; };
+const clipMeta = (root, take) => json(path.join(root, 'clips', `${take}.json`));
+const segmentAt = (segments, t) => {
+  let label = '';
+  for (const [start, name] of segments) if (start <= t + 1e-6) label = name;
+  return label;
+};
+const labelAt = (segments, t) => `${t.toFixed(1).padStart(6)}s  ${segmentAt(segments, t)}`;
 
 function duration(file) {
   const r = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8' });
@@ -46,16 +54,33 @@ export async function review(root, args) {
   const out = path.join(root, 'out', 'review'); fs.mkdirSync(out, { recursive: true });
   if (args.includes('--raw')) {
     const raw = path.join(root, 'raw', target), frames = json(path.join(raw, 'frames.json'));
-    const picks = frames.length > 16 ? Array.from({ length: 16 }, (_, k) => frames[Math.round(k * (frames.length - 1) / 15)]) : frames;
-    const entries = picks.map(([t, file]) => [path.join(raw, 'frames', file), `${((t - frames[0][0]) / 1000).toFixed(1)}s`]);
-    await sheet(root, cfg, entries, `raw/${target} · ${frames.length} frames`, path.join(out, `${target}.raw.png`));
+    const logFile = path.join(raw, 'log.json'), log = exists(logFile) ? json(logFile) : [];
+    const t0 = frames[0][0];
+    const segments = log.filter((e) => /^[+-]/.test(e[1])).map((e) =>
+      [e[0] / 1000 - t0, e[1][0] === '+' ? e[1].slice(1) : `(cut: after ${e[1].slice(1)})`])
+      .sort((a, b) => a[0] - b[0]);
+    const picks = frames.length > 16 ? Array.from({ length: 16 }, (_, k) => frames[roundEven(k * (frames.length - 1) / 15)]) : frames;
+    const entries = picks.map(([t, file]) => [path.join(raw, 'frames', file), labelAt(segments, t - t0)]);
+    await sheet(root, cfg, entries, `raw/${target} · ${frames.length} frames · ${(frames.at(-1)[0] - t0).toFixed(1)}s captured`, path.join(out, `${target}.raw.png`));
     return;
   }
-  let video;
+  let video, segments;
   if (target === 'final') {
     video = path.join(root, 'out', `${cfg.name ?? 'screencast'}.mp4`);
     if (!exists(video)) video = path.join(root, 'out', `${cfg.name ?? 'screencast'}-silent.mp4`);
-  } else video = path.join(root, 'clips', `${target}.mp4`);
+    let start = 0; segments = [];
+    for (const item of json(path.join(root, 'timeline.json')).items) {
+      const file = path.join(root, 'clips', `${item.take}.json`);
+      if (!exists(file)) continue;
+      const meta = json(file);
+      for (const s of meta.segments) segments.push([start + s.start, `${item.take} · ${s.segment}`]);
+      start += meta.duration;
+    }
+  } else {
+    video = path.join(root, 'clips', `${target}.mp4`);
+    segments = clipMeta(root, target).segments.map((s) => [s.start, s.segment]);
+  }
+  segments.sort((a, b) => a[0] - b[0]);
   if (!exists(video)) throw new Error(`no ${path.relative(root, video)}`);
   const ats = args.flatMap((v, i) => v === '--at' ? [Number(args[i + 1])] : []);
   const times = ats.length ? ats : (() => { const d = duration(video), step = args.includes('--every') ? Number(args[args.indexOf('--every') + 1]) : Math.max(.5, d / 16); const a = []; for (let t = 0; t < d - .05; t += step) a.push(t); return a; })();
@@ -63,7 +88,7 @@ export async function review(root, args) {
   for (let i = 0; i < times.length; i++) {
     const t = times[i], dest = ats.length ? path.join(out, `${target}@${t}.png`) : path.join(out, `.${target}-${i}.png`);
     await ffmpeg(['-ss', t.toFixed(3), '-i', video, '-frames:v', '1', '-y', dest]);
-    if (ats.length) console.log(dest); else entries.push([dest, `${t.toFixed(1)}s`]);
+    if (ats.length) console.log(`${dest}  (${segmentAt(segments, t)})`); else entries.push([dest, labelAt(segments, t)]);
   }
   if (!ats.length) {
     try { await sheet(root, cfg, entries, `${path.basename(video)} · ${duration(video).toFixed(1)}s`, path.join(out, `${target}.png`)); }

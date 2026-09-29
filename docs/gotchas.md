@@ -133,6 +133,8 @@ check first.
 - **Loudness.** Mono voice normalised to −16 LUFS reads about −13 once duplicated to two
   channels, because a meter sums them. `vo-mix` makes the track stereo *before* measuring, and
   normalises in two passes.
+- **No Python runtime for post-production.** `vo-script`, `pauses`, `vo-mix`, and `review` run
+  in Node. Keep ffmpeg and ffprobe on `PATH`; review sheets use headless Chrome.
 - **Use `-t`, not `-shortest`.** `-shortest` can end the video at the audio's last packet.
 - **Split at pauses, anchor to beats.** One recorded block rarely lines up with the picture as a
   whole. Cut it at sentence pauses (`ghostcast pauses`) and anchor each piece to its segment.

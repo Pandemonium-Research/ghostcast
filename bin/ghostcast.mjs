@@ -13,7 +13,6 @@ import { gitBash } from '../src/shell.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = path.resolve(HERE, '..');
-const PY = path.join(PKG, 'py');
 
 const HELP = `ghostcast — a recording studio for coding agents
 
@@ -44,22 +43,6 @@ const die = (msg) => { console.error(msg); process.exit(1); };
 
 const projectDir = path.resolve(opt('--project', process.cwd()));
 const cmd = argv.shift();
-
-function optionalPython() {
-  if (process.env.GHOSTCAST_PYTHON) return process.env.GHOSTCAST_PYTHON;
-  for (const p of process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python']) {
-    if (spawnSync(p, ['--version'], { stdio: 'ignore' }).status === 0) return p;
-  }
-  return null;
-}
-function python() { return optionalPython() || die('no Python found (set GHOSTCAST_PYTHON); vo-script, pauses and vo-mix still use Python'); }
-
-function py(script, args) {
-  const r = spawnSync(python(), [path.join(PY, script), ...args], {
-    stdio: 'inherit', env: { ...process.env, GHOSTCAST_PROJECT: projectDir, PYTHONUTF8: '1' },
-  });
-  return r.status ?? 1;
-}
 
 function timeline() {
   const f = path.join(projectDir, 'timeline.json');
@@ -200,12 +183,6 @@ const commands = {
     check('Google Chrome', chrome.find((c) => fs.existsSync(c)), 'install Chrome, or set browser.channel in project.json (e.g. "msedge"), or run `npx playwright install chromium` and set it to "chromium"');
     check('ffmpeg', which('ffmpeg'), 'install ffmpeg and put it on PATH');
     check('ffprobe', which('ffprobe'), 'comes with ffmpeg');
-    const p = optionalPython();
-    console.log(`info  Python for vo-script, pauses and vo-mix: ${p || 'not found (set GHOSTCAST_PYTHON to use those commands)'}`);
-    if (p) {
-      const pil = spawnSync(p, ['-c', 'import PIL; print(PIL.__version__)'], { encoding: 'utf8' });
-      console.log(`info  Pillow for Python review.py: ${pil.status === 0 ? pil.stdout.trim() : 'not found (ghostcast review uses its Node fallback)'}`);
-    }
     check('VS Code CLI (only for editor scenes)', which('code'), 'install VS Code and its `code` command');
     if (process.platform === 'win32') check('Git Bash (terminal scenes on Windows)', gitBash(), 'install Git for Windows');
     const cli = vscodeCliDir();
@@ -256,13 +233,12 @@ const commands = {
   async cut() { if (!argv.length) die('usage: ghostcast cut <take> [...]'); const { cut } = await import('../src/post/render.mjs'); for (const take of argv) await cut(projectDir, take); },
   async assemble() { const { assemble } = await import('../src/post/render.mjs'); await assemble(projectDir); },
   async review() {
-    const p = optionalPython();
-    if (p && spawnSync(p, ['-c', 'import PIL'], { stdio: 'ignore' }).status === 0) { process.exit(py('review.py', argv)); }
-    const { review } = await import('../src/post/review.mjs'); await review(projectDir, argv);
+    const { review } = await import('../src/post/review.mjs');
+    try { await review(projectDir, argv); } catch (e) { die(e.message); }
   },
-  'vo-script'() { process.exit(py('vo_script.py', argv)); },
-  pauses() { process.exit(py('pauses.py', argv)); },
-  'vo-mix'() { process.exit(py('vo_mix.py', argv)); },
+  async 'vo-script'() { const { voScript } = await import('../src/post/voice.mjs'); try { voScript(projectDir); } catch (e) { die(e.message); } },
+  async pauses() { const { pauses } = await import('../src/post/voice.mjs'); try { await pauses(argv); } catch (e) { die(e.message); } },
+  async 'vo-mix'() { const { voMix } = await import('../src/post/voice.mjs'); try { await voMix(projectDir, argv); } catch (e) { die(e.message); } },
 
   async all() {
     const headed = flag('--headed');

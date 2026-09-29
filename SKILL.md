@@ -29,8 +29,8 @@ building anything. Then map it:
 ## Workflow
 
 1. **Set up.**
-   - `npm install` in this package, then `ghostcast doctor`. It checks Chrome, ffmpeg, Python and
-     Pillow, and the VS Code CLI for editor scenes.
+   - `npm install` in this package, then `ghostcast doctor`. It checks Chrome, ffmpeg,
+     and the VS Code CLI for editor scenes.
    - `ghostcast init <dir>` makes a project from the template: three sample takes (title card,
      terminal, web page) you can record straight away to check the machine.
    - For editor takes, VS Code must be served:

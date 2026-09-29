@@ -23,17 +23,20 @@ function captionSignature(root, cfg, caps) {
     width: cfg.output.width, height: cfg.output.height, fps: cfg.output.fps, version: VERSION }));
 }
 
-export async function ffmpeg(args) {
-  await new Promise((resolve, reject) => {
-    const child = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', ...args], { stdio: ['ignore', 'ignore', 'pipe'] });
+async function runFfmpeg(args, capture) {
+  return await new Promise((resolve, reject) => {
+    const child = spawn('ffmpeg', ['-hide_banner', ...(capture ? [] : ['-loglevel', 'error']), ...args], { stdio: ['ignore', 'ignore', 'pipe'] });
     try { os.setPriority(child.pid, process.platform === 'win32' ? os.constants.priority.PRIORITY_BELOW_NORMAL : 10); }
     catch (e) { child.kill(); reject(new Error(`cannot lower ffmpeg priority: ${e.message}`)); return; }
     let err = '';
     child.stderr.on('data', (x) => { err += x; });
     child.on('error', reject);
-    child.on('exit', (code) => code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}: ${err}`)));
+    child.on('exit', (code) => code === 0 ? resolve(capture ? err : undefined) : reject(new Error(`ffmpeg exited ${code}: ${err}`)));
   });
 }
+
+export async function ffmpeg(args) { return runFfmpeg(args, false); }
+export async function ffmpegStderr(args) { return runFfmpeg(args, true); }
 
 function probeSize(p) {
   const r = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=width,height', '-of', 'json', p], { encoding: 'utf8' });

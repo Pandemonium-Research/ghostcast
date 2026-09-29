@@ -9,7 +9,6 @@
   "files": [
     "bin/",
     "src/",
-    "py/*.py",
     "templates/",
     "docs/",
     "SKILL.md"

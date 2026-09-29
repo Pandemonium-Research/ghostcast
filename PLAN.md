@@ -170,13 +170,14 @@ Progress (Windows; measured on the bake-off takes at a true 2880×1620):
     Lanczos scale, captions and `N×` tag, x264 `veryfast` CRF 16) below normal priority; repeated
     frames are warped once; full-frame stretches skip the warp; beats render one at a time
     (`GHOSTCAST_JOBS` for more); assembly joins beats by stream copy.
+  - `vo-script`, `pauses`, `vo-mix`, and every `review` mode in Node; the Python post-production
+    directory removed.
 - **Measured** (best of three, cold cache): registry 0.47 s and validate 0.36 s per output
   second, against Pillow's 4.5 and 3.0. SSIM against the Pillow reference: mean 0.9975 and
   0.9987, minimum 0.9937 and 0.9942. Peak 760 MiB per ffmpeg. The zoom expression grows
   linearly: 33,633 characters for 50 camera moves (review caught an exponential first version
   that failed past 12). The full suite runs in 82 s instead of 178 s.
-- **Left:** the voice commands and `review` in Node, then Python removed; a clean `npx` install;
-  macOS and Linux.
+- **Left:** a clean `npx` install; macOS and Linux.
 
 Decide:
 

@@ -60,9 +60,20 @@ step('all records, cuts and assembles every template take', () => {
   assert.match(read('out/smoke.cues.md'), /terminal · terminal_count/);
 });
 
-step('review writes a contact sheet of the cut', () => {
+step('review writes sheets and labelled stills for a take and the final cut', () => {
+  ok(gc('review', 'title', '--every', '1'), 'review take --every');
+  assert.ok(fs.existsSync(file('out/review/title.png')));
+  const take = gc('review', 'title', '--at', '0.2', '--at', '0.5');
+  ok(take, 'review take --at');
+  assert.match(take.out, /title_card/);
+  assert.ok(fs.existsSync(file('out/review/title@0.2.png')));
+  assert.ok(fs.existsSync(file('out/review/title@0.5.png')));
   ok(gc('review', 'final'), 'review final');
   assert.ok(fs.existsSync(file('out/review/final.png')));
+  const final = gc('review', 'final', '--at', '0.2');
+  ok(final, 'review final --at');
+  assert.match(final.out, /title · title_card/);
+  assert.ok(fs.existsSync(file('out/review/final@0.2.png')));
 });
 
 step('vo-script times the narration against the cut', () => {
@@ -110,6 +121,15 @@ step('vo-mix lays the voice on its beats at broadcast loudness', () => {
   const readings = [...r.stderr.matchAll(/I:\s+(-?[\d.]+) LUFS/g)];
   const lufs = Number(readings.at(-1)[1]);
   assert.ok(Math.abs(lufs + 16) <= 1, `integrated loudness ${lufs} LUFS, want -16 ± 1`);
+});
+
+step('review final uses the finished video when it exists', () => {
+  const silent = file('out/smoke-silent.mp4'), held = `${silent}.held`;
+  fs.renameSync(silent, held);
+  try {
+    ok(gc('review', 'final', '--every', '4'), 'review finished video');
+    assert.ok(fs.existsSync(file('out/review/final.png')));
+  } finally { fs.renameSync(held, silent); }
 });
 
 step('a failing take leaves a screenshot and is reviewable', () => {

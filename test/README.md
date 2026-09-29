@@ -2,7 +2,7 @@
 
 ```bash
 npm test             # everything (about a minute and a half)
-npm run test:unit    # Node post functions and the remaining Python functions
+npm run test:unit    # Node post and voice functions
 npm run test:smoke   # the end-to-end run only
 ```
 
@@ -20,8 +20,8 @@ expected outputs, worked out from the rules rather than copied from the code. Th
 `config.json` is the project configuration the vectors assume.
 
 `post.test.mjs` runs the unchanged `cut.json` and `assemble.json` vectors against Node and checks
-that a caption edit invalidates only its covered beat. `unit.test.mjs` runs the voice-over and
-pause vectors against the remaining Python code. Add a case here whenever a rule changes or a bug
+that a caption edit invalidates only its covered beat. `unit.test.mjs` runs the unchanged voice-over and
+pause vectors against Node. Add a case here whenever a rule changes or a bug
 is fixed.
 
 ## Smoke test
@@ -30,11 +30,11 @@ is fixed.
 CLI end to end:
 
 1. record, cut and assemble the title, terminal and web takes;
-2. review the cut;
+2. review contact sheets and labelled stills of takes and the cut;
 3. time the narration;
 4. find the pauses in a generated stand-in clip;
 5. mix a voice-over, checking its loudness independently (−16 LUFS ± 1);
 6. record a take that fails on purpose, checking it leaves a screenshot.
 
-It needs Chrome and ffmpeg, plus Python for the remaining voice commands. The project is deleted
+It needs Chrome and ffmpeg. The project is deleted
 afterwards unless a step failed; then its path is printed for inspection.

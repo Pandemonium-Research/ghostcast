@@ -3,7 +3,7 @@
 *Screencasts with nobody at the keyboard.* ghostcast films real software in the background
 (terminals, editors and web apps) while your agent directs.
 
-> **Status: 0.1, with Node cut and assembly.** Everything below works today. [VISION.md](VISION.md)
+> **Status: 0.1, with Node post-production.** Everything below works today. [VISION.md](VISION.md)
 > describes the product being built on it, and [PLAN.md](PLAN.md) the stages toward version 1.
 
 An agent writes a scene per shot: open a clean terminal on a project, type a command, zoom onto the line
@@ -67,8 +67,6 @@ Requirements:
 
 - Node 20+ and Google Chrome (or Edge, via `browser.channel`).
 - ffmpeg on `PATH`.
-- Python 3 for the remaining voice-over commands (`vo-script`, `pauses`, `vo-mix`). Pillow is
-  needed only to run `py/review.py` directly; `ghostcast review` has a Node fallback.
 - On Windows, Git Bash for terminal scenes; on macOS and Linux, `/bin/bash`.
 - The `code` CLI only for editor scenes.
 
@@ -149,10 +147,9 @@ Planned for version 1 ([PLAN.md](PLAN.md)):
 
 ## Status
 
-Version 0.1, with `cut` and `assemble` ported to Node. Beats are rendered once and cached under
-`cache/beats/`; assembly joins those beats without re-encoding. The Node post-production path is
-tested on Windows 11 with Chrome and ffmpeg 8. The remaining voice commands use Python 3.14.
-macOS and Linux have not been verified.
+Version 0.1, with post-production in Node. Beats are rendered once and cached under
+`cache/beats/`; assembly joins those beats without re-encoding. No Python is needed. Tested on
+Windows 11 with Node 22, Chrome and ffmpeg 8; macOS and Linux have not been verified yet.
 
 `npm test` runs the unit tests and an end-to-end smoke test; see [`test/README.md`](test/README.md).
 
