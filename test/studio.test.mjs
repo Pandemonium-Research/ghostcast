@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -51,6 +52,179 @@ function writeStory(studio, story) {
 function rules(studio, level = 'errors') {
   return lint(studio)[level].map((problem) => problem.rule);
 }
+
+function nextJson(cwd) {
+  const output = cli(cwd, 'next', '--json');
+  assert.equal(output.status, 0, output.stderr);
+  return JSON.parse(output.stdout);
+}
+
+function storyboardHash(studio) {
+  return crypto.createHash('sha256').update(fs.readFileSync(path.join(studio, 'storyboard.yaml'))).digest('hex');
+}
+
+function writeRehearsal(studio, value) {
+  fs.mkdirSync(path.join(studio, 'cache'), { recursive: true });
+  fs.writeFileSync(path.join(studio, 'cache', 'rehearsal.json'), JSON.stringify(value));
+}
+
+test('next walks init, understand, brief, storyboard, lint, approve, rehearse and shoot', (t) => {
+  const dir = fixture(t);
+  let report = nextJson(dir);
+  assert.equal(report.stage, 'init');
+  assert.match(report.next, /ghostcast init/);
+  assert.equal(cli(dir, 'init').status, 0);
+  const studio = path.join(dir, '.ghostcast');
+  report = nextJson(dir);
+  assert.equal(report.stage, 'understand');
+  assert.match(report.next, /complete product\.md/);
+  assert.match(report.next, /What it is/);
+  fs.writeFileSync(path.join(studio, 'product.md'), sampleProduct);
+  report = nextJson(dir);
+  assert.equal(report.stage, 'brief');
+  assert.match(report.next, /fill brief\.md/);
+  assert.match(report.next, /audience/);
+  fs.writeFileSync(path.join(studio, 'brief.md'), sampleBrief);
+  report = nextJson(dir);
+  assert.equal(report.stage, 'storyboard');
+  assert.match(report.next, /ghostcast template how-to/);
+  const story = { ...sampleStory, weight: 'standard', beats: [
+    { ...sampleStory.beats[0], say: Array(40).fill('word').join(' ') },
+    { id: 'finish', surface: 'web', open: '/done', show: 'text "Done"', say: 'The result is complete.' },
+  ] };
+  writeStory(studio, story);
+  const refused = cli(dir, 'approve', 'storyboard');
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /fix the lint errors before asking for approval/);
+  assert.ok(!fs.existsSync(path.join(studio, 'approvals.json')));
+  report = nextJson(dir);
+  assert.equal(report.stage, 'lint');
+  assert.match(report.next, /ghostcast lint/);
+  assert.ok(report.problems.some((problem) => /word-budget/.test(problem.message)));
+  assert.match(cli(dir, 'next').stdout, /^lint · .*\n  ✗ /);
+  story.beats[0].say = sampleStory.beats[0].say;
+  writeStory(studio, story);
+  report = nextJson(dir);
+  assert.equal(report.stage, 'approve');
+  assert.match(report.next, /ghostcast approve storyboard/);
+  assert.match(report.next, /estimated runtime \([\d.]+ s \/ 120 s cap\)/);
+  const approved = cli(dir, 'approve', 'storyboard');
+  assert.equal(approved.status, 0, approved.stderr);
+  assert.match(approved.stdout, /^approved storyboard \([a-f0-9]{8}\) · next: run `ghostcast rehearse`\n$/);
+  const approval = JSON.parse(fs.readFileSync(path.join(studio, 'approvals.json'), 'utf8'));
+  assert.equal(approval.storyboard.sha256, storyboardHash(studio));
+  assert.ok(!Number.isNaN(Date.parse(approval.storyboard.at)));
+  assert.deepEqual(fs.readFileSync(path.join(studio, 'cache', 'approved', 'storyboard.yaml')),
+    fs.readFileSync(path.join(studio, 'storyboard.yaml')));
+  report = nextJson(studio);
+  assert.equal(report.stage, 'rehearse');
+  assert.match(report.next, /ghostcast rehearse/);
+
+  const pass = (id) => ({ id, status: 'pass', passes: 3, reached: 3, errors: [], warnings: [] });
+  const base = { storyboardHash: storyboardHash(studio), runs: 3, partial: false, beats: [pass('result'), pass('finish')] };
+  writeRehearsal(studio, { ...base, storyboardHash: 'stale' });
+  report = nextJson(dir);
+  assert.equal(report.stage, 'rehearse');
+  assert.match(report.state, /stale/);
+  assert.match(report.next, /ghostcast rehearse/);
+  writeRehearsal(studio, { ...base, partial: true, beats: [pass('result')] });
+  report = nextJson(dir);
+  assert.equal(report.stage, 'rehearse');
+  assert.match(report.state, /partial/);
+  assert.match(report.next, /ghostcast rehearse` to confirm every beat/);
+  writeRehearsal(studio, { ...base, beats: [
+    { id: 'result', status: 'flaky', passes: 2, reached: 3, errors: ['prompt timed out'], warnings: [] },
+    { id: 'finish', status: 'unconfirmed', passes: 2, reached: 2, errors: [], warnings: [] },
+  ] });
+  report = nextJson(dir);
+  assert.equal(report.stage, 'rehearse');
+  assert.match(report.state, /0 of 2 beats pass/);
+  assert.match(report.next, /ghostcast rehearse result`/);
+  assert.doesNotMatch(report.next, /finish/);
+  assert.match(cli(dir, 'next').stdout, /✗ result\s+flaky \(2 of 3\): prompt timed out/);
+  writeRehearsal(studio, { ...base, beats: [
+    { id: 'result', status: 'fail', passes: 0, reached: 3, errors: ['target missing'], warnings: [] },
+    { id: 'finish', status: 'unreached', passes: 0, reached: 0, errors: [], warnings: [] },
+  ] });
+  report = nextJson(dir);
+  assert.equal(report.stage, 'rehearse');
+  assert.match(report.next, /ghostcast rehearse result`/);
+  assert.doesNotMatch(report.next, /finish/);
+  writeRehearsal(studio, { ...base, beats: [pass('result'), { ...pass('finish'), warnings: ['small-text'], textPx: 12.2 }] });
+  report = nextJson(dir);
+  assert.equal(report.stage, 'shoot');
+  assert.match(report.next, /ghostcast all/);
+  assert.equal(report.warnings, 1);
+  assert.ok(report.problems.some((problem) => /small text/.test(problem.message)));
+  assert.match(cli(dir, 'next').stdout, /^shoot · .*\n  ! finish\s+warning: small text/);
+});
+
+test('next reopens approval for changed beats and identifies mechanics-only changes', (t) => {
+  const { dir, studio } = init(t);
+  const story = { ...sampleStory, weight: 'standard', beats: [
+    { ...sampleStory.beats[0], do: [{ click: 'Start' }] },
+    { id: 'finish', surface: 'web', open: '/done', show: 'text "Done"', say: 'The result is complete.' },
+  ] };
+  writeStory(studio, story);
+  assert.equal(cli(dir, 'approve', 'storyboard').status, 0);
+  story.beats[0].do = [{ click: 'Run' }];
+  writeStory(studio, story);
+  // A change to how a beat is performed goes on to rehearsal, then needs approval before the shoot.
+  let report = nextJson(dir);
+  assert.equal(report.stage, 'rehearse');
+  const pass = (id) => ({ id, status: 'pass', passes: 3, reached: 3, errors: [], warnings: [] });
+  writeRehearsal(studio, { storyboardHash: storyboardHash(studio), runs: 3, partial: false, beats: [pass('result'), pass('finish')] });
+  report = nextJson(dir);
+  assert.equal(report.stage, 'approve');
+  assert.match(report.state, /changed since approval/);
+  assert.ok(report.problems.some((problem) => problem.id === 'result' && /changed beat/.test(problem.message)));
+  assert.ok(report.problems.some((problem) => /only how the beats are performed changed/.test(problem.message)));
+  assert.equal(cli(dir, 'approve', 'storyboard').status, 0);
+  assert.equal(nextJson(dir).stage, 'shoot');
+  story.beats[0].say = 'The new result is ready.';
+  writeStory(studio, story);
+  report = nextJson(dir);
+  assert.equal(report.stage, 'approve');
+  assert.ok(!report.problems.some((problem) => /only how the beats are performed changed/.test(problem.message)));
+  story.beats.push({ id: 'extra', surface: 'web', open: '/extra', show: 'text "Extra"', say: 'See another result.' });
+  writeStory(studio, story);
+  report = nextJson(dir);
+  assert.ok(report.problems.some((problem) => problem.id === 'extra' && /added beat/.test(problem.message)));
+  story.beats.splice(1, 1);
+  writeStory(studio, story);
+  report = nextJson(dir);
+  assert.ok(report.problems.some((problem) => problem.id === 'finish' && /removed beat/.test(problem.message)));
+  story.beats = [
+    { id: 'finish', surface: 'web', open: '/done', show: 'text "Done"', say: 'The result is complete.' },
+    story.beats[0], story.beats[1],
+  ];
+  writeStory(studio, story);
+  report = nextJson(dir);
+  assert.ok(report.problems.some((problem) => /reordered beat/.test(problem.message)));
+});
+
+test('next sends a quick brief directly to shoot and limits lint error output', (t) => {
+  const { dir, studio } = init(t);
+  fs.writeFileSync(path.join(studio, 'brief.md'), sampleBrief.replace('weight: standard', 'weight: quick'));
+  let report = nextJson(dir);
+  assert.equal(report.stage, 'quick');
+  assert.match(report.next, /ghostcast shoot/);
+  fs.writeFileSync(path.join(studio, 'brief.md'), sampleBrief);
+  const story = { ...sampleStory, weight: 'standard', beats: Array.from({ length: 12 }, (_, i) => ({
+    id: `beat${i}`, surface: 'web', open: '/demo', show: 'text "Ready"', say: Array(40).fill('word').join(' '),
+  })) };
+  writeStory(studio, story);
+  report = nextJson(dir);
+  assert.equal(report.stage, 'lint');
+  assert.equal(report.problems.length, 9);
+  assert.match(report.problems.at(-1).message, /and \d+ more/);
+  assert.equal(cli(dir, 'next').status, 0);
+  writeStory(studio, { ...sampleStory, weight: 'standard', beats: [{ ...sampleStory.beats[0], do: [{ wait: 12 }] }] });
+  report = nextJson(dir);
+  assert.equal(report.stage, 'approve');
+  assert.ok(report.warnings > 0);
+  assert.match(cli(dir, 'next').stdout, /\d+ warning/);
+});
 
 test('init adds the studio, keeps files, fills gaps, and warns outside git', (t) => {
   const dir = fixture(t);
@@ -376,4 +550,13 @@ test('a web beat after another surface, or first, needs open; compile refuses it
   story.beats[1].open = 'index.html';
   writeStory(studio, story);
   assert.equal(cli(path.dirname(studio), 'compile').status, 0);
+});
+
+test('a CRLF checkout of an approved storyboard keeps its approval and rehearsal', (t) => {
+  const { dir, studio } = init(t);
+  writeStory(studio, { ...sampleStory, weight: 'standard' });
+  assert.equal(cli(dir, 'approve', 'storyboard').status, 0);
+  const file = path.join(studio, 'storyboard.yaml');
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/\n/g, '\r\n'));
+  assert.equal(nextJson(dir).stage, 'rehearse');
 });

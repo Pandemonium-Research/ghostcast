@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -7,6 +6,7 @@ import { inject, launch, makeHelpers } from '../recorder.mjs';
 import { view_track } from '../post/logic.mjs';
 import { estimateBeat } from './lint.mjs';
 import { compile } from './compile.mjs';
+import { storyboardHash } from './approve.mjs';
 
 const oneLine = (error) => (error?.message || String(error)).split('\n')[0];
 const timeout = (work, ms) => {
@@ -29,7 +29,7 @@ export async function rehearse(project, { ids = [], runs = 3, headed = false } =
   const last = ids.length ? Math.max(...ids.map((id) => story.beats.findIndex((beat) => beat.id === id))) : story.beats.length - 1;
   const selected = story.beats.slice(0, last + 1);
   const scene = await import(pathToFileURL(path.join(project.root, 'cache', 'storyboard.mjs')).href + `?rehearse=${Date.now()}`);
-  const hash = crypto.createHash('sha256').update(fs.readFileSync(path.join(project.root, 'storyboard.yaml'))).digest('hex');
+  const hash = storyboardHash(project.root);
   const dir = path.join(project.root, 'cache', 'rehearsal');
   fs.mkdirSync(dir, { recursive: true });
   const entries = selected.map((beat) => ({ id: beat.id, status: 'unreached', passes: 0, reached: 0, errors: [], ms: Array(runs).fill(null), textPx: null, warnings: [], show: Array(runs).fill(null) }));

@@ -23,6 +23,8 @@ const HELP = `ghostcast — a recording studio for coding agents
   ghostcast init <dir>                  create a sample project
   ghostcast template <type> [--force]   write a launch, how-to, feature or receipt storyboard
   ghostcast lint [--json]               check the studio plan and its timing
+  ghostcast approve storyboard          record approval of the lint-clean storyboard
+  ghostcast next [--json]               report the first unfinished studio stage and next action
   ghostcast compile                     generate cache/storyboard.mjs and timeline.json
   ghostcast rehearse [beat ids...] [--runs 3] [--headed]
                                         dry run beats without capture and report flakiness
@@ -229,6 +231,25 @@ const commands = {
     const report = lint(studioDir());
     console.log(json ? JSON.stringify(report, null, 2) : formatLint(report));
     if (report.errors.length) process.exitCode = 1;
+  },
+
+  async approve() {
+    if (argv.length !== 1 || argv[0] !== 'storyboard') die('usage: ghostcast approve storyboard');
+    const { approveStoryboard } = await import('../src/studio/approve.mjs');
+    const { next } = await import('../src/studio/next.mjs');
+    try {
+      const dir = studioDir();
+      const hash = approveStoryboard(dir);
+      console.log(`approved storyboard (${hash.slice(0, 8)}) · next: ${next(dir).next}`);
+    } catch (error) { die(error.message); }
+  },
+
+  async next() {
+    const json = flag('--json');
+    if (argv.length) die('usage: ghostcast next [--json]');
+    const { next, formatNext } = await import('../src/studio/next.mjs');
+    const report = next(studioDir());
+    console.log(json ? JSON.stringify(report, null, 2) : formatNext(report));
   },
 
   async compile() {
