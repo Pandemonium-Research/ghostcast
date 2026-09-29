@@ -12,10 +12,10 @@ as work lands.
 | Stage | Name | Depends on | Status |
 |---|---|---|---|
 | 0 | [Groundwork](#stage-0--groundwork) | — | Done: see [docs/bakeoff.md](docs/bakeoff.md) |
-| 1 | [One-command install](#stage-1--one-command-install) | 0 | In progress: Node post-production done |
-| 2 | [Isolation](#stage-2--isolation) | 1 | Done on Windows (Linux and macOS with stage 1) |
-| 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Done on Windows (Linux and macOS with stage 1) |
-| 4 | [Plan](#stage-4--plan) | 2 | Not started |
+| 1 | [One-command install](#stage-1--one-command-install) | 0 | Done: CI on Windows, macOS and Linux |
+| 2 | [Isolation](#stage-2--isolation) | 1 | Done: CI on Windows, macOS and Linux |
+| 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Done: first clip in 29 to 46 s on each OS |
+| 4 | [Plan](#stage-4--plan) | 2 | In progress: studio folder, lint, compiler and rehearsal done |
 | 5 | [Direction](#stage-5--direction) | 4 | Not started |
 | 6 | [Checks](#stage-6--checks) | 4, 5 | Not started |
 | 7 | [Voice](#stage-7--voice) | 1, 4 | Not started |
@@ -181,9 +181,12 @@ Progress (Windows; measured on the bake-off takes at a true 2880×1620):
   into an empty folder it takes 3 s and 37 MB (dependencies hoisted beside it), `doctor` passes,
   and `init` + `all` + `review` make the 28 s template video in 72 s. Running straight from
   `npx`'s cache (`npx --package=<tarball> ghostcast`) passes `doctor` and records a take too.
-- **Left:** macOS and Linux. This machine's WSL Ubuntu lacks Node, ffmpeg and Chrome, and
-  installing Chrome's system libraries needs `sudo`; CI on GitHub (Windows, macOS, Linux) is
-  the lasting answer and needs the repository created first.
+- **macOS and Linux:** GitHub Actions runs `doctor` and the whole suite on Windows, macOS and
+  Ubuntu (the sample project, isolation and quick shoots included). It found one real bug:
+  current ffmpeg builds (Homebrew's, Chocolatey's) dropped `-filter_complex_script`, so every
+  cut failed there; the option is now chosen by ffmpeg version.
+- **Decided:** ffmpeg's `perspective` filter composites; ffmpeg stays a system requirement that
+  `doctor` checks; Windows terminals use Git Bash.
 
 Decide:
 
@@ -279,7 +282,8 @@ Progress:
   The grid is now fitted to the cells xterm actually renders.
 - `test/shoot.test.mjs` covers a command from inside the source, a local page and a failing
   command: formats, exit codes, an untouched source and an empty cache afterwards.
-- Linux and macOS timing waits on the stage 1 environments.
+- Timed in CI from the packed package to a first clip: Windows 46 s, Linux 41 s, macOS 29 s
+  (install 4 to 7 s; the rest is the shoot).
 
 Build:
 

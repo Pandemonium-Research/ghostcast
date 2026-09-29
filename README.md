@@ -82,8 +82,6 @@ source, `--out <file>` chooses the output name, `--timeout <seconds>` caps a com
 and `--keep` retains the temporary project for inspection. A command's exit code is reported
 even when it fails. No project files are needed.
 
-For a multi-scene project, use the template workflow:
-
 Requirements:
 
 - Node 20+ and Google Chrome (or Edge, via `browser.channel`).
@@ -91,33 +89,53 @@ Requirements:
 - On Windows, Git Bash for terminal scenes; on macOS and Linux, `/bin/bash`.
 - The `code` CLI only for editor scenes.
 
-```bash
-git clone <this repo> ghostcast && cd ghostcast
-npm install                       # Playwright, xterm and a prebuilt pty; uses your installed Chrome
-node bin/ghostcast.mjs doctor
-node bin/ghostcast.mjs init ../my-demo && cd ../my-demo
+`npx ghostcast doctor` checks them.
 
-node ../ghostcast/bin/ghostcast.mjs all          # record + cut every take, then assemble
-node ../ghostcast/bin/ghostcast.mjs review final # contact sheet in out/review/final.png
+### A planned video
+
+For a how-to, a feature or a launch, the plan lives in `.ghostcast/` next to the code it shows,
+and `ghostcast next` says what to do at each step:
+
+```bash
+npx ghostcast init                # adds .ghostcast/: product.md, brief.md, world.yaml, audio.yaml
+npx ghostcast next                # where the video stands, and the one next action
+npx ghostcast template how-to     # a storyboard skeleton: launch, how-to, feature or receipt
+npx ghostcast lint                # one claim per beat, word budgets, panel share, the cap
+npx ghostcast approve storyboard  # after the user has approved it
+npx ghostcast rehearse            # every beat three times, without filming; flaky beats reported
+npx ghostcast all                 # film the storyboard, cut and assemble
+npx ghostcast review final        # contact sheet in .ghostcast/out/review/final.png
 ```
+
+A storyboard is a list of beats, each with what to do (`click`, `fill`, `press`, `run`, `wait`,
+or Playwright code), what the viewer must see (`show`) and what is said (`say`). There are no
+sleeps, zoom calls or timestamps in it. [`SKILL.md`](SKILL.md) has the format.
 
 Only editor scenes need `ghostcast vscode --accept-server-license-terms`. Read the VS Code Server
 license before using that command. Its first run downloads the server; wait for "VS Code is ready"
 before recording an editor scene.
 
-The template records a title card, a terminal take and a web take (about 30 s). For convenience,
-`npm link` puts `ghostcast` on your `PATH`.
+`ghostcast init <dir>` makes a sample project of hand-written code scenes (a title card, a
+terminal take and a web take, about 30 s): the engine the storyboard compiles to, documented in
+[`docs/scene-api.md`](docs/scene-api.md).
 
 **For agents:** load [`SKILL.md`](SKILL.md). It has the workflow and the rules (honest timing,
-nothing faked, no personal data, ask before costly or outward-facing steps). The helpers are in
-[`docs/scene-api.md`](docs/scene-api.md).
+nothing faked, no personal data, only the user approves, ask before costly or outward-facing
+steps).
 
 ## Commands
 
 | | |
 |---|---|
-| `ghostcast init <dir>` | New project from the template |
 | `ghostcast shoot <command\|url> [--in dir] [--out file] [--timeout seconds] [--keep]` | Film one command or page into an MP4 and GIF, with no project |
+| `ghostcast init` | Add `.ghostcast/` to this repository |
+| `ghostcast next [--json]` | Where the video stands, and the one next action |
+| `ghostcast template <type> [--force]` | Storyboard skeleton: launch, how-to, feature or receipt |
+| `ghostcast lint [--json]` | Check the plan files and estimate each beat against the cap |
+| `ghostcast approve storyboard` | Record the user's approval against the storyboard's hash |
+| `ghostcast compile` | Storyboard → generated scene and timeline (record and all do this first) |
+| `ghostcast rehearse [beat…] [--runs 3] [--headed]` | Dry-run beats without filming; flaky beats reported |
+| `ghostcast init <dir>` | A sample project of hand-written code scenes |
 | `ghostcast doctor` | Check the toolchain |
 | `ghostcast vscode [--port]` | Serve VS Code for editor scenes, with its settings and clean shell |
 | `ghostcast record <take> [--headed] [--keep-world]` | Run a scene and capture it in one isolated world |
@@ -169,8 +187,9 @@ Planned for version 1 ([PLAN.md](PLAN.md)):
 ## Status
 
 Version 0.1, with post-production in Node. Beats are rendered once and cached under
-`cache/beats/`; assembly joins those beats without re-encoding. No Python is needed. Tested on
-Windows 11 with Node 22, Chrome and ffmpeg 8; macOS and Linux have not been verified yet.
+`cache/beats/`; assembly joins those beats without re-encoding. No Python is needed. CI runs
+the whole suite, real headless shoots included, on Windows, macOS and Ubuntu with Node 22, and
+times a first clip from a clean install on each (29 to 46 s).
 
 `npm test` runs the unit tests and an end-to-end smoke test; see [`test/README.md`](test/README.md).
 
