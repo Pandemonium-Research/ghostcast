@@ -7,7 +7,7 @@ description: Make a demo video or screencast of real software (terminal commands
 
 A headless studio. It films real software in an off-screen Chrome, inside a disposable copy of
 the project, so nothing on the user's screen is recorded and nothing in their checkout changes.
-Then it cuts, zooms, captions and tags what it filmed.
+Then it cuts, zooms and speed-tags what it filmed.
 
 The `ghostcast` command is `node <this package>/bin/ghostcast.mjs` (or `npx ghostcast`). Run
 `ghostcast doctor` once to check Chrome, ffmpeg and bash.
@@ -39,24 +39,33 @@ Do what `next` says, then run it again. Its stages, in order:
 1. **Understand.** Read the project (README, package scripts, routes, CLI help, changelog) and
    answer every section of `.ghostcast/product.md`: what it is, how to run it, seed data,
    signing in, the flows worth showing, what must stay off screen. "none needed" is an answer.
-2. **Brief.** Fill `.ghostcast/brief.md` **with the user**: audience, goal, weight, type
-   (launch, how-to, feature, receipt), the length cap, destinations, audio. Ask; don't invent.
+2. **Brief.** Fill `.ghostcast/brief.md` **with the user**. Every field is theirs to choose:
+   audience, goal, weight, type (launch, how-to, feature, receipt), the length cap in seconds,
+   destinations, and audio (see [Audio](#audio)). Ask; don't invent. Optionally `panel_share`
+   (default 0.2): the most of the runtime that panels may take.
 3. **Storyboard.** `ghostcast template <type>` writes a skeleton with the type's narrative
-   frame; replace every `<placeholder>` with real beats (reference below). Set up the world in
-   `.ghostcast/world.yaml` when the product needs a server, seed data or ignored files.
-4. **Lint.** `ghostcast lint` checks the files and estimates each beat against the cap. Fix
-   every error. Never raise the cap on your own: cut or tighten beats.
-5. **Approve.** Show the user each beat (what it shows, what it says) and the estimated runtime.
+   frame (it needs the brief first); replace every `<placeholder>` with real beats (reference
+   below). Set up [the world](#the-world) when the product needs a server, seed data or ignored
+   files.
+4. **Lint.** `ghostcast lint` checks the files and estimates each beat against the brief's cap.
+   Fix every error. Never raise the cap on your own: cut or tighten beats.
+5. **Rehearse.** `ghostcast rehearse` runs every beat three times without filming, each run
+   from the same prepared copy. Fix the beats it reports (a failing or flaky beat, a target that
+   never appears, text too small), then `ghostcast rehearse <ids>` to retry just those, and a
+   full `ghostcast rehearse` to confirm. The user then approves a plan known to work.
+6. **Approve.** Show the user each beat (what it shows, what it says) and the estimated runtime.
    Only when **they** say yes, run `ghostcast approve storyboard`. Any later edit reopens the
-   approval; `next` names the beats that changed.
-6. **Rehearse.** `ghostcast rehearse` runs every beat three times without filming. Fix the beats
-   it reports (a failing or flaky beat, a target that never appears, text too small), then
-   `ghostcast rehearse <ids>` to retry just those, and a full `ghostcast rehearse` to confirm.
+   approval (after another rehearsal); `next` names the beats that changed.
 7. **Shoot.** `ghostcast all` films the storyboard, cuts and assembles
    `.ghostcast/out/<video>-silent.mp4`.
 8. **Look.** `ghostcast review final` writes a contact sheet; `--at <seconds>` a full-size still.
    **Open the images and look.** Is the text legible? Is the right thing framed? Is anything
-   stuck, cut off, or personal? Fix the storyboard and shoot again.
+   stuck, cut off, or personal (a user name or home path in a prompt)? Fix the storyboard and
+   shoot again.
+
+Commit `.ghostcast/` with the project: the plan files, `approvals.json`, and your own `panels/`
+(HTML pages for panels) and `scenes/` (code scenes). `cache/`, `raw/`, `clips/`, `out/` and
+`logs/` are generated and git-ignored.
 
 ## The storyboard
 
@@ -64,7 +73,6 @@ Do what `next` says, then run it again. Its stages, in order:
 # .ghostcast/storyboard.yaml
 video: first-invoice
 type: how-to
-cap: 90
 beats:
   - id: intro
     surface: panel
@@ -108,14 +116,43 @@ beats:
 - **camera**: `wide` keeps the full frame for that beat.
 - **script**: `scenes/x.mjs`, a code scene for a beat the storyboard can't express
   (see `docs/scene-api.md`).
+- **cap**: comes from the brief. A storyboard may set a lower one, never a higher one.
 - Never edit `cache/storyboard.mjs` or `timeline.json`: they are generated from the storyboard.
 
-## Voice-over
+## The world
 
-Built-in speech comes later. Until then the user records clips; you place them. Put the clips in
-`.ghostcast/voiceover/`, run `ghostcast pauses voiceover/*` to find sentence breaks, write
-`voiceover/plan.json` with pieces anchored to `take: storyboard` and `segment: <beat id>`, then
-`ghostcast vo-mix` and fix everything under "Problems" in its report.
+Shoots and rehearsals run in a copy of the repository, never in the checkout.
+`.ghostcast/world.yaml` says how to make it:
+
+```yaml
+source: ..            # the repository around .ghostcast/
+mode: snapshot        # the working tree as it is now, uncommitted and untracked files included,
+                      # git-ignored files excluded; or `commit` with `ref: <branch or sha>`
+copy: [.env]          # git-ignored files or folders to copy in as well
+setup:                # bash commands run once in the new copy; every reset (each take, each
+  - cp shelf.json.example shelf.json   # rehearsal run) returns to the state after them
+services:             # started before, stopped after
+  - name: web
+    cmd: npm start
+    port: true        # a free port, passed as PORT and as ${PORT} below
+    ready: { url: "http://127.0.0.1:${PORT}/", timeout: 30000 }
+```
+
+`open: /path` in a web beat goes to the first service with `port: true`. `link: [folder]` links a
+large read-only folder instead of copying it; a write through a link fails the shoot.
+
+## Audio
+
+The brief's `audio` and `.ghostcast/audio.yaml` say where the voice comes from. Today:
+
+- **none**: a silent video. `say` lines are **not** shown as captions yet; they are the script
+  and the timing budget.
+- **clips**: the user records the lines; you place them. Put the clips in
+  `.ghostcast/voiceover/`, run `ghostcast pauses voiceover/*` to find sentence breaks, write
+  `voiceover/plan.json` with pieces anchored to `take: storyboard` and `segment: <beat id>`,
+  then `ghostcast vo-mix` and fix everything under "Problems" in its report.
+
+Built-in speech (kokoro, locally; ElevenLabs with the user's own key) comes in a later version.
 
 ## Rules
 

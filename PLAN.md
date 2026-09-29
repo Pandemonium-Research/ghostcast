@@ -15,7 +15,7 @@ as work lands.
 | 1 | [One-command install](#stage-1--one-command-install) | 0 | Done: CI on Windows, macOS and Linux |
 | 2 | [Isolation](#stage-2--isolation) | 1 | Done: CI on Windows, macOS and Linux |
 | 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Done: first clip in 29 to 46 s on each OS |
-| 4 | [Plan](#stage-4--plan) | 2 | In progress: studio folder, lint, compiler and rehearsal done |
+| 4 | [Plan](#stage-4--plan) | 2 | Done: a fresh agent reached an approved, rehearsed storyboard from SKILL.md alone |
 | 5 | [Direction](#stage-5--direction) | 4 | Not started |
 | 6 | [Checks](#stage-6--checks) | 4, 5 | Not started |
 | 7 | [Voice](#stage-7--voice) | 1, 4 | Not started |
@@ -302,6 +302,31 @@ Done when:
 
 **Goal:** the studio's spine. An agent can go from nothing to a rehearsed storyboard by
 following `ghostcast next`.
+
+Progress:
+
+- Built: `ghostcast init` inside a repository (`.ghostcast/`), schemas with paths and line
+  numbers for every plan file, the product.md questionnaire, a storyboard template per video
+  type, the lint (one claim, word budgets, pacing, panel share, the cap, targets fit for their
+  surface, actions with nothing to wait on, literal keys), the compiler (a generated scene with a
+  segment per beat, so `all`, `cut` and `assemble` work unchanged), three-run rehearsal with a
+  status per beat (pass, flaky, fail, unconfirmed, unreached), approvals keyed to the
+  storyboard's hash, `ghostcast next`, and SKILL.md rewritten around it.
+- **Acceptance run:** a fresh agent session, given only SKILL.md, took a small sample repository
+  (a web page and a CLI, with a service in world.yaml) from `ghostcast init` to an approved,
+  rehearsed storyboard: five beats, 33 s against a 60 s cap, 5 of 5 beats passing three runs.
+  The supervisor answered its brief questions and its approval request as the user. Shot
+  afterwards, the storyboard films as planned in 59 s, source untouched. The lint catches a
+  planted over-long line and a planted two-claim beat (tests).
+- **Changed from the plan:** `next` rehearses before it asks for approval, so the user approves a
+  plan known to work and rehearsal fixes never reopen an approval (the acceptance agent did this
+  on its own). Hashes normalise line endings, so a CRLF checkout keeps its approval.
+- The agent's friction log (16 items) drove a round of fixes: placeholders ignored in code spans
+  and quoted in messages, every brief field left for the user to choose, audio defaults that
+  exist today, a world.yaml that explains itself, ghostcast's own state under `cache/`, and a
+  storyboard stage in `next`.
+- Open: `say` lines are not captioned when the audio is none; narration burned in as captions
+  belongs to stage 8, and voice to stage 7.
 
 Build:
 
