@@ -10,7 +10,8 @@
     "bin/",
     "src/",
     "templates/",
-    "docs/",
+    "docs/scene-api.md",
+    "docs/gotchas.md",
     "SKILL.md"
   ],
   "scripts": {

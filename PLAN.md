@@ -177,7 +177,13 @@ Progress (Windows; measured on the bake-off takes at a true 2880×1620):
   0.9987, minimum 0.9937 and 0.9942. Peak 760 MiB per ffmpeg. The zoom expression grows
   linearly: 33,633 characters for 50 camera moves (review caught an exponential first version
   that failed past 12). The full suite runs in 82 s instead of 178 s.
-- **Left:** a clean `npx` install; macOS and Linux.
+- **Clean install checked** (Windows): `npm pack` gives a 51 kB package of 27 files; installed
+  into an empty folder it takes 3 s and 37 MB (dependencies hoisted beside it), `doctor` passes,
+  and `init` + `all` + `review` make the 28 s template video in 72 s. Running straight from
+  `npx`'s cache (`npx --package=<tarball> ghostcast`) passes `doctor` and records a take too.
+- **Left:** macOS and Linux. This machine's WSL Ubuntu lacks Node, ffmpeg and Chrome, and
+  installing Chrome's system libraries needs `sudo`; CI on GitHub (Windows, macOS, Linux) is
+  the lasting answer and needs the repository created first.
 
 Decide:
 
