@@ -69,6 +69,21 @@ ghostcast is for videos of software as it really runs.
 
 ## Quick start
 
+From the directory you want to film:
+
+```bash
+npx ghostcast shoot "npm test"
+npx ghostcast shoot https://example.com
+```
+
+Each quick shoot writes a 1080p `<name>.mp4` and a looping `<name>.gif` in the current
+directory. A command runs in a disposable copy of that directory; `--in <dir>` chooses another
+source, `--out <file>` chooses the output name, `--timeout <seconds>` caps a command's wait,
+and `--keep` retains the temporary project for inspection. A command's exit code is reported
+even when it fails. No project files are needed.
+
+For a multi-scene project, use the template workflow:
+
 Requirements:
 
 - Node 20+ and Google Chrome (or Edge, via `browser.channel`).
@@ -102,6 +117,7 @@ nothing faked, no personal data, ask before costly or outward-facing steps). The
 | | |
 |---|---|
 | `ghostcast init <dir>` | New project from the template |
+| `ghostcast shoot <command\|url> [--in dir] [--out file] [--timeout seconds] [--keep]` | Film one command or page into an MP4 and GIF, with no project |
 | `ghostcast doctor` | Check the toolchain |
 | `ghostcast vscode [--port]` | Serve VS Code for editor scenes, with its settings and clean shell |
 | `ghostcast record <take> [--headed] [--keep-world]` | Run a scene and capture it in one isolated world |

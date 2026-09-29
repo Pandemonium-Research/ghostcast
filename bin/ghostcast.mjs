@@ -17,6 +17,8 @@ const PKG = path.resolve(HERE, '..');
 
 const HELP = `ghostcast — a recording studio for coding agents
 
+  ghostcast shoot <command|url> [--in <dir>] [--out <file>] [--timeout <seconds>] [--keep]
+                                        quick MP4 + README GIF, no project needed
   ghostcast init <dir>                  new project from the template
   ghostcast doctor                      check Chrome, ffmpeg and editor tools
   ghostcast vscode [--port 8765] --accept-server-license-terms
@@ -151,6 +153,8 @@ function writeMachineSettings(dataDir) {
 
 const commands = {
   help() { console.log(HELP); },
+
+  async shoot() { const { shoot } = await import('../src/shoot.mjs'); try { await shoot(argv); } catch (e) { die(e.message); } },
 
   init() {
     const dir = argv[0] ? path.resolve(argv[0]) : die('usage: ghostcast init <dir>');

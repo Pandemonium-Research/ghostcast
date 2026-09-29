@@ -20,7 +20,7 @@ function git(cwd, args) {
   if (r.status !== 0) throw new Error(`git ${args[0]}: ${r.stderr?.trim() || r.error?.message || 'failed'}`);
   return r.stdout;
 }
-function isGit(dir) {
+export function isGit(dir) {
   const r = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd: dir, encoding: 'utf8', env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } });
   return r.status === 0 && fs.realpathSync(r.stdout.trim()) === fs.realpathSync(dir);
 }

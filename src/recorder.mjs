@@ -114,6 +114,8 @@ export function makeHelpers(project, page, log, world = null) {
   let terminalData = null;
   let terminalOutput = Promise.resolve();
   let terminalBindings = false;
+  let terminalExited = null;
+  let terminalExitCode = null;
 
   const closeTerminal = () => {
     terminalData?.dispose();
@@ -131,10 +133,18 @@ export function makeHelpers(project, page, log, world = null) {
     // cut.py keeps a little footage either side of a segment; the pauses keep off-camera work (a
     // palette opening, a layout change) out of that margin. A name ending "@4x" plays sped up;
     // "@fit3" plays in 3 seconds whatever its real length (for model calls, installs, clones).
-    async seg(name, fn) {
+    async seg(name, fn, { fitAfterMs = Infinity, fitSeconds = 4 } = {}) {
       await sleep(450);
+      const start = log.length;
       h.log('+' + name);
-      try { return await fn(); } finally { h.log('-' + name); await sleep(550); }
+      try { return await fn(); } finally {
+        if (Date.now() - log[start][0] > fitAfterMs) {
+          const fitted = `${name}@fit${fitSeconds}`;
+          log[start][1] = '+' + fitted;
+          h.log('-' + fitted);
+        } else h.log('-' + name);
+        await sleep(550);
+      }
     },
 
     async type(text, { cps = 17 } = {}) {
@@ -154,15 +164,21 @@ export function makeHelpers(project, page, log, world = null) {
     },
 
     // ---- terminal (the active pane; see useTerm) ----
-    prompt: (opts = {}) => ev((o) => window.__rec.term.prompt(o), opts),
+    prompt: (opts = {}) => Promise.race([
+      ev((o) => window.__rec.term.prompt(o), opts),
+      ...(terminalExited ? [terminalExited.then((code) => { throw new Error(`terminal exited with code ${code}`); })] : []),
+    ]),
+    get terminalExitCode() { return terminalExitCode; },
     termText: () => ev(() => window.__rec.term.text()),
     termRect: (match, opts = {}) => ev(([m, o]) => window.__rec.term.rect(m, o), [match, opts]),
+    terminalLastRect: (command, opts = {}) => ev(([c, o]) => window.__rec.term.lastRect(c, o), [command, opts]),
     useTerm: (i) => ev((p) => window.__rec.term.use(p), i),
     async waitFor(re, timeout = 180000) {
       await page.waitForFunction((src) => new RegExp(src).test(window.__rec.term.text()), re.source, { timeout, polling: 200 });
     },
     // Type a command at a human pace, run it, and wait for the prompt to come back.
-    async run(cmd, { cps, after = 900, ...opts } = {}) {
+    async typeCommand(cmd, { cps } = {}) {
+      if (!cmd) throw new Error('run: empty command');
       // The first key after focus moves into the terminal is sometimes dropped, so it is sent on its
       // own and confirmed on screen (and resent once) before the rest follows.
       const lastRow = () => ev(() => window.__rec.term.rows().filter((s) => s.trim()).slice(-1)[0] || '');
@@ -188,6 +204,9 @@ export function makeHelpers(project, page, log, world = null) {
       }
       if (!tail.includes(want)) throw new Error(`run: "${cmd}" did not reach the terminal (last row: "${tail.trim()}")`);
       await sleep(jitter(280));
+    },
+    async run(cmd, { cps, after = 900, ...opts } = {}) {
+      await h.typeCommand(cmd, { cps });
       await page.keyboard.press('Enter');
       const out = await h.prompt(opts);
       await sleep(after);
@@ -270,6 +289,8 @@ export function makeHelpers(project, page, log, world = null) {
   h.terminal = {
     async open(folder, { fontSize = 24, padding = 30 } = {}) {
       closeTerminal();
+      terminalExited = null;
+      terminalExitCode = null;
       const cwd = sceneFolder(folder);
       if (!fs.statSync(cwd).isDirectory()) throw new Error(`terminal.open: not a folder: ${cwd}`);
       const rc = path.join(project.root, 'vscode', 'shell.bashrc');
@@ -286,27 +307,25 @@ export function makeHelpers(project, page, log, world = null) {
         html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #fff; }
         #terminal { box-sizing: border-box; width: 100vw; height: 100vh; padding: ${padding}px; }
         .xterm { height: 100%; }
+        .xterm .xterm-viewport { background-color: #fff; }
       ` });
       await page.addScriptTag({ path: path.join(XTERM, 'lib', 'xterm.js') });
       const size = await page.evaluate(({ fontSize }) => {
         const host = document.getElementById('terminal');
-        const probe = document.createElement('span');
-        probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${fontSize}px 'Cascadia Mono',Consolas,Menlo,'DejaVu Sans Mono',monospace;`;
-        probe.textContent = 'W'.repeat(100);
-        host.appendChild(probe);
-        const cellWidth = probe.getBoundingClientRect().width / 100;
-        const cellHeight = fontSize * 1.25;
-        probe.remove();
-        const style = getComputedStyle(host);
-        const cols = Math.max(2, Math.floor((host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)) / cellWidth));
-        const rows = Math.max(2, Math.floor((host.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)) / cellHeight));
         const term = new Terminal({
-          cols, rows, fontSize, lineHeight: 1.25,
+          cols: 80, rows: 24, fontSize, lineHeight: 1.25,
           fontFamily: "'Cascadia Mono', Consolas, Menlo, 'DejaVu Sans Mono', monospace",
           cursorBlink: false, scrollback: 1000,
           theme: { background: '#ffffff', foreground: '#24292f', cursor: '#555555', selectionBackground: '#c8ddf5' },
         });
         term.open(host);
+        // Cells come from the font's own metrics (35px tall for 24px Cascadia Mono, not 30), so
+        // the grid is fitted to what xterm rendered; otherwise the last rows fall below the page.
+        const screen = host.querySelector('.xterm-screen').getBoundingClientRect();
+        const style = getComputedStyle(host);
+        const cols = Math.max(2, Math.floor((host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)) / (screen.width / 80)));
+        const rows = Math.max(2, Math.floor((host.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)) / (screen.height / 24)));
+        term.resize(cols, rows);
         term.onData((data) => window.__ghostcastTerminalInput(data));
         term.focus();
         window.__ghostcastTerminal = term;
@@ -315,9 +334,14 @@ export function makeHelpers(project, page, log, world = null) {
       const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
         !/^(CLAUDE|ANTHROPIC|OPENAI|CODEX)/.test(key) && key !== 'PROMPT_COMMAND'));
       env.TERM = 'xterm-256color';
+      if (project.config.shoot?.statusFile) env.GHOSTCAST_SHOOT_STATUS_FILE = project.config.shoot.statusFile;
       terminalPty = pty.spawn(shell, ['--rcfile', rc.replace(/\\/g, '/'), '-i'], {
         name: 'xterm-256color', cols: size.cols, rows: size.rows, cwd, env,
       });
+      terminalExited = new Promise((resolve) => terminalPty.onExit(({ exitCode }) => {
+        terminalExitCode = exitCode;
+        resolve(exitCode);
+      }));
       terminalData = terminalPty.onData((data) => {
         terminalOutput = terminalOutput.then(() => page.evaluate((chunk) => window.__ghostcastTerminal?.write(chunk), data)).catch(() => {});
       });

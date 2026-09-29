@@ -15,7 +15,16 @@ Nothing on the user's screen is recorded, and nothing on it gets in the way.
 The `ghostcast` command is `node <this package>/bin/ghostcast.mjs`. Run it from the project directory,
 or pass `--project <dir>`.
 
-## Before anything: agree the script
+## Quick shoots
+
+For one command or one page, use `ghostcast shoot "npm test"` or
+`ghostcast shoot https://example.com`. This needs no project or storyboard. It films commands
+in a disposable copy of the current directory and writes `<name>.mp4` plus a README sized
+`<name>.gif` there. Use `--in <dir>` for another source, `--out <file>` for the output name,
+`--timeout <seconds>` for a command wait, and `--keep` to inspect the temporary project.
+The command's exit code is printed, including failures.
+
+## For a planned video: agree the script
 
 A demo is a sequence of **beats**, one claim each, shown and not asserted. Write the script
 (beats, commands, what the viewer should notice, narration) and get the user's agreement before

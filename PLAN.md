@@ -14,7 +14,7 @@ as work lands.
 | 0 | [Groundwork](#stage-0--groundwork) | — | Done: see [docs/bakeoff.md](docs/bakeoff.md) |
 | 1 | [One-command install](#stage-1--one-command-install) | 0 | In progress: Node post-production done |
 | 2 | [Isolation](#stage-2--isolation) | 1 | Done on Windows (Linux and macOS with stage 1) |
-| 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Not started |
+| 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Done on Windows (Linux and macOS with stage 1) |
 | 4 | [Plan](#stage-4--plan) | 2 | Not started |
 | 5 | [Direction](#stage-5--direction) | 4 | Not started |
 | 6 | [Checks](#stage-6--checks) | 4, 5 | Not started |
@@ -257,6 +257,29 @@ Done when:
 ## Stage 3 · Quick shoots
 
 **Goal:** M1. The first clip within five minutes of installing.
+
+Progress:
+
+- `ghostcast shoot <command|url>` builds a throwaway project in the cache, records, cuts and
+  assembles a 1080p MP4, and writes a looping GIF of up to 12 s (800 px, under 10 MB). It
+  reports the command's exit code, a timeout, and the total time. A wait over eight seconds
+  plays sped up in four (`@fit4`).
+- A command runs in a stage-2 copy; `node_modules` is copied, not linked, so a tool writing its
+  cache there cannot reach the real one. The source is checked before the outputs are written
+  into it, and a leak fails the shoot. A folder outside git with over 20,000 files (a home
+  folder, a drive) is refused rather than copied.
+- A page is only read, so a URL shoot makes no copy: a copy cannot change what a running server
+  or a file on disk shows. This departs from "both run in the isolated copy" above.
+- Camera: a command is typed close up, pulled back for the run, then the last output rows are
+  framed. A page is shown wide, its heading framed when it is narrow, then scrolled two screens.
+- Measured on Windows: install to first clip in 29 s (7 s install, 21 s shoot). A URL shoot
+  takes 17 s; filming this repo's unit tests (38 s of tests) takes 64–74 s.
+- Found on the way: the terminal page sized its grid for 30 px rows, but xterm draws 35 px rows
+  at 24 px Cascadia Mono, so the last three rows of every terminal scene fell below the page.
+  The grid is now fitted to the cells xterm actually renders.
+- `test/shoot.test.mjs` covers a command from inside the source, a local page and a failing
+  command: formats, exit codes, an untouched source and an empty cache afterwards.
+- Linux and macOS timing waits on the stage 1 environments.
 
 Build:
 

@@ -15,7 +15,7 @@
     "SKILL.md"
   ],
   "scripts": {
-    "test": "node --test test/post.test.mjs test/unit.test.mjs test/world.test.mjs test/smoke.test.mjs",
+    "test": "node --test test/post.test.mjs test/unit.test.mjs test/world.test.mjs test/smoke.test.mjs test/shoot.test.mjs",
     "test:unit": "node --test test/post.test.mjs test/unit.test.mjs test/world.test.mjs",
     "test:smoke": "node --test test/smoke.test.mjs"
   },

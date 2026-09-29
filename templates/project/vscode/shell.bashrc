@@ -15,4 +15,9 @@ export CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL=true
 # (git-ignored). Never `cat` or `echo` them in a take.
 [ -f "$(dirname "${BASH_SOURCE[0]}")/secrets.env" ] && . "$(dirname "${BASH_SOURCE[0]}")/secrets.env"
 
+# Quick shoots record the shell's status off camera after each prompt.
+if [ -n "${GHOSTCAST_SHOOT_STATUS_FILE:-}" ]; then
+  PROMPT_COMMAND='printf "%s\n" "$?" > "$GHOSTCAST_SHOOT_STATUS_FILE"'
+fi
+
 # Project-specific setup goes below: PATH to the tool being demonstrated, its config, wrappers.

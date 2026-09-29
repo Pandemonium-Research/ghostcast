@@ -1,5 +1,9 @@
 # Scene API
 
+For a single command or page, `ghostcast shoot "npm test"` or
+`ghostcast shoot https://example.com` builds the scene for you and writes an MP4 and GIF.
+It needs no project files. Use this API when directing a multi-scene project.
+
 A scene is an ES module in the project, `scenes/<take>.mjs` by default. A timeline item's `scene`
 field can name another path.
 

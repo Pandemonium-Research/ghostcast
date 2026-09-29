@@ -186,6 +186,20 @@
         if (i < 0) throw new Error('rec: terminal row not found: ' + match);
         return R.union(all.slice(i, i + rows).map(textBox).filter(Boolean), pad);
       },
+      // Frame the last visible output rows. Include the command when it is still close enough
+      // to the output; a broad rectangle around the entire terminal would waste the zoom.
+      lastRect(command, { rows = 6, pad = 10 } = {}) {
+        const all = termRows();
+        let last = all.length - 1;
+        while (last > 0 && !rowText(all[last]).trim()) last--;
+        if (rowText(all[last]).trim() === '$') last--;
+        const first = Math.max(0, last - rows + 1);
+        let start = first;
+        for (let i = last; i >= Math.max(0, first - 2); i--)
+          if (command && rowText(all[i]).includes(command)) { start = i; break; }
+        const boxes = all.slice(start, last + 1).map(textBox).filter(Boolean);
+        return boxes.length ? R.union(boxes, pad) : R.union(all.slice(-2).map(textBox).filter(Boolean), pad);
+      },
     },
 
     // ---- editor (Monaco) -------------------------------------------------------------------------
