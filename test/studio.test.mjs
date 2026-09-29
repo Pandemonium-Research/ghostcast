@@ -17,7 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'bin', 'ghostcast.mjs');
 const studioTemplate = (name) => fs.readFileSync(path.join(ROOT, 'templates', 'studio', name), 'utf8');
 const sampleProduct = `## What it is\nA demo app.\n\n## How to run it\nRun npm start.\n\n## Seed data\nnone needed\n\n## Signing in\nnone needed\n\n## Flows worth showing\n- Open the app and see a result.\n\n## Off limits\nPrivate accounts.\n`;
-const sampleBrief = `---\naudience: Developers\ngoal: Show a successful result\nweight: standard\ntype: how-to\ncap: 120\ndestinations: [docs]\naudio: kokoro\npanel_share: 0.2\n---\n\n# Notes\n`;
+const sampleBrief = `---\naudience: Developers\ngoal: Show a successful result\nweight: standard\ntype: how-to\ncap: 120\ndestinations: [docs]\naudio: none\npanel_share: 0.2\n---\n\n# Notes\n`;
 const sampleStory = {
   video: 'demo', weight: 'quick', type: 'how-to', cap: 120,
   beats: [{ id: 'result', surface: 'web', open: '/demo', show: 'text "Ready"', claim: 'The page works.', say: 'The result is ready.' }],
@@ -68,7 +68,7 @@ function writeRehearsal(studio, value) {
   fs.writeFileSync(path.join(studio, 'cache', 'rehearsal.json'), JSON.stringify(value));
 }
 
-test('next walks init, understand, brief, storyboard, lint, approve, rehearse and shoot', (t) => {
+test('next walks init, understand, brief, storyboard, lint, rehearse, approve and shoot', (t) => {
   const dir = fixture(t);
   let report = nextJson(dir);
   assert.equal(report.stage, 'init');
@@ -83,7 +83,8 @@ test('next walks init, understand, brief, storyboard, lint, approve, rehearse an
   report = nextJson(dir);
   assert.equal(report.stage, 'brief');
   assert.match(report.next, /fill brief\.md/);
-  assert.match(report.next, /audience/);
+  for (const field of ['audience', 'goal', 'weight', 'type', 'cap', 'destinations', 'audio'])
+    assert.match(report.next, new RegExp(field));
   fs.writeFileSync(path.join(studio, 'brief.md'), sampleBrief);
   report = nextJson(dir);
   assert.equal(report.stage, 'storyboard');
@@ -105,18 +106,6 @@ test('next walks init, understand, brief, storyboard, lint, approve, rehearse an
   story.beats[0].say = sampleStory.beats[0].say;
   writeStory(studio, story);
   report = nextJson(dir);
-  assert.equal(report.stage, 'approve');
-  assert.match(report.next, /ghostcast approve storyboard/);
-  assert.match(report.next, /estimated runtime \([\d.]+ s \/ 120 s cap\)/);
-  const approved = cli(dir, 'approve', 'storyboard');
-  assert.equal(approved.status, 0, approved.stderr);
-  assert.match(approved.stdout, /^approved storyboard \([a-f0-9]{8}\) · next: run `ghostcast rehearse`\n$/);
-  const approval = JSON.parse(fs.readFileSync(path.join(studio, 'approvals.json'), 'utf8'));
-  assert.equal(approval.storyboard.sha256, storyboardHash(studio));
-  assert.ok(!Number.isNaN(Date.parse(approval.storyboard.at)));
-  assert.deepEqual(fs.readFileSync(path.join(studio, 'cache', 'approved', 'storyboard.yaml')),
-    fs.readFileSync(path.join(studio, 'storyboard.yaml')));
-  report = nextJson(studio);
   assert.equal(report.stage, 'rehearse');
   assert.match(report.next, /ghostcast rehearse/);
 
@@ -152,6 +141,18 @@ test('next walks init, understand, brief, storyboard, lint, approve, rehearse an
   assert.doesNotMatch(report.next, /finish/);
   writeRehearsal(studio, { ...base, beats: [pass('result'), { ...pass('finish'), warnings: ['small-text'], textPx: 12.2 }] });
   report = nextJson(dir);
+  assert.equal(report.stage, 'approve');
+  assert.match(report.next, /ghostcast approve storyboard/);
+  assert.match(report.next, /estimated runtime \([\d.]+ s \/ 120 s cap\)/);
+  const approved = cli(dir, 'approve', 'storyboard');
+  assert.equal(approved.status, 0, approved.stderr);
+  assert.match(approved.stdout, /^approved storyboard \([a-f0-9]{8}\) · next: shoot it with `ghostcast all`\n$/);
+  const approval = JSON.parse(fs.readFileSync(path.join(studio, 'approvals.json'), 'utf8'));
+  assert.equal(approval.storyboard.sha256, storyboardHash(studio));
+  assert.ok(!Number.isNaN(Date.parse(approval.storyboard.at)));
+  assert.deepEqual(fs.readFileSync(path.join(studio, 'cache', 'approved', 'storyboard.yaml')),
+    fs.readFileSync(path.join(studio, 'storyboard.yaml')));
+  report = nextJson(studio);
   assert.equal(report.stage, 'shoot');
   assert.match(report.next, /ghostcast all/);
   assert.equal(report.warnings, 1);
@@ -169,7 +170,7 @@ test('next reopens approval for changed beats and identifies mechanics-only chan
   assert.equal(cli(dir, 'approve', 'storyboard').status, 0);
   story.beats[0].do = [{ click: 'Run' }];
   writeStory(studio, story);
-  // A change to how a beat is performed goes on to rehearsal, then needs approval before the shoot.
+  // A change to how a beat is performed goes through rehearsal, then needs approval.
   let report = nextJson(dir);
   assert.equal(report.stage, 'rehearse');
   const pass = (id) => ({ id, status: 'pass', passes: 3, reached: 3, errors: [], warnings: [] });
@@ -184,22 +185,34 @@ test('next reopens approval for changed beats and identifies mechanics-only chan
   story.beats[0].say = 'The new result is ready.';
   writeStory(studio, story);
   report = nextJson(dir);
+  assert.equal(report.stage, 'rehearse');
+  writeRehearsal(studio, { storyboardHash: storyboardHash(studio), runs: 3, partial: false, beats: story.beats.map((beat) => pass(beat.id)) });
+  report = nextJson(dir);
   assert.equal(report.stage, 'approve');
   assert.ok(!report.problems.some((problem) => /only how the beats are performed changed/.test(problem.message)));
   story.beats.push({ id: 'extra', surface: 'web', open: '/extra', show: 'text "Extra"', say: 'See another result.' });
   writeStory(studio, story);
+  assert.equal(nextJson(dir).stage, 'rehearse');
+  writeRehearsal(studio, { storyboardHash: storyboardHash(studio), runs: 3, partial: false, beats: story.beats.map((beat) => pass(beat.id)) });
   report = nextJson(dir);
+  assert.equal(report.stage, 'approve');
   assert.ok(report.problems.some((problem) => problem.id === 'extra' && /added beat/.test(problem.message)));
   story.beats.splice(1, 1);
   writeStory(studio, story);
+  assert.equal(nextJson(dir).stage, 'rehearse');
+  writeRehearsal(studio, { storyboardHash: storyboardHash(studio), runs: 3, partial: false, beats: story.beats.map((beat) => pass(beat.id)) });
   report = nextJson(dir);
+  assert.equal(report.stage, 'approve');
   assert.ok(report.problems.some((problem) => problem.id === 'finish' && /removed beat/.test(problem.message)));
   story.beats = [
     { id: 'finish', surface: 'web', open: '/done', show: 'text "Done"', say: 'The result is complete.' },
     story.beats[0], story.beats[1],
   ];
   writeStory(studio, story);
+  assert.equal(nextJson(dir).stage, 'rehearse');
+  writeRehearsal(studio, { storyboardHash: storyboardHash(studio), runs: 3, partial: false, beats: story.beats.map((beat) => pass(beat.id)) });
   report = nextJson(dir);
+  assert.equal(report.stage, 'approve');
   assert.ok(report.problems.some((problem) => /reordered beat/.test(problem.message)));
 });
 
@@ -221,7 +234,7 @@ test('next sends a quick brief directly to shoot and limits lint error output', 
   assert.equal(cli(dir, 'next').status, 0);
   writeStory(studio, { ...sampleStory, weight: 'standard', beats: [{ ...sampleStory.beats[0], do: [{ wait: 12 }] }] });
   report = nextJson(dir);
-  assert.equal(report.stage, 'approve');
+  assert.equal(report.stage, 'rehearse');
   assert.ok(report.warnings > 0);
   assert.match(cli(dir, 'next').stdout, /\d+ warning/);
 });
@@ -231,6 +244,8 @@ test('init adds the studio, keeps files, fills gaps, and warns outside git', (t)
   const first = cli(dir, 'init');
   assert.equal(first.status, 0, first.stderr);
   assert.match(first.stdout + first.stderr, /not a git repository/);
+  assert.match(first.stdout, /created \.ghostcast\/panels\//);
+  assert.match(first.stdout, /created \.ghostcast\/scenes\//);
   const studio = path.join(dir, '.ghostcast');
   for (const name of ['brief.md', 'product.md', 'world.yaml', 'audio.yaml', '.gitignore']) assert.ok(fs.existsSync(path.join(studio, name)), name);
   for (const name of ['panels', 'scenes']) assert.deepEqual(fs.readdirSync(path.join(studio, name)), []);
@@ -242,7 +257,7 @@ test('init adds the studio, keeps files, fills gaps, and warns outside git', (t)
   assert.equal(fs.readFileSync(path.join(studio, 'brief.md'), 'utf8'), 'my custom brief\n');
   assert.ok(fs.existsSync(path.join(studio, 'audio.yaml')));
   assert.match(second.stdout, /kept \.ghostcast[\\/]brief\.md/);
-  assert.match(second.stdout, /created \.ghostcast[\\/]audio\.yaml/);
+  assert.match(second.stdout, /created \.ghostcast\/audio\.yaml/);
   const sample = path.join(dir, 'sample');
   assert.equal(cli(dir, 'init', sample).status, 0);
   assert.ok(fs.existsSync(path.join(sample, 'project.json')));
@@ -297,11 +312,50 @@ test('brief and product schemas report valid, missing, enum, unknown, and placeh
     [sampleBrief.replace('weight: standard', 'weight: epic'), 'weight'],
     [sampleBrief.replace('goal: Show a successful result\n', ''), 'goal'],
     [sampleBrief.replace('audience: Developers', 'audience: <People>'), 'audience'],
-    [sampleBrief.replace('audio: kokoro', 'audio: kokoro\nextra: value'), 'extra'],
+    [sampleBrief.replace('audio: none', 'audio: none\nextra: value'), 'extra'],
   ]) assert.ok(validateBrief(source).some((p) => p.path === pathName), pathName);
   assert.ok(validateProduct(sampleProduct.replace('## Off limits', '## Other')).some((p) => p.path === 'Off limits'));
   assert.ok(validateProduct(studioTemplate('product.md')).some((p) => p.path === 'What it is'));
   assert.ok(validateProduct(sampleProduct.replace('- Open the app and see a result.', 'Open the app.')).some((p) => p.path === 'Flows worth showing'));
+});
+
+test('product CLI examples in code spans and fences are not placeholders; prose placeholders quote their text', () => {
+  const examples = sampleProduct.replace('Run npm start.', 'Run `usage: shelf add <title>`.\n\n```text\nusage: shelf add <title>\n```');
+  assert.deepEqual(validateProduct(examples), []);
+  assert.deepEqual(validateProduct(sampleProduct.replace('Private accounts.', 'Private accounts. Use ``usage: shelf add <title>``.\n\n~~~~text\nusage: shelf add <title>')),
+    [], 'an unclosed fence continues to the end of the document');
+  const problem = validateProduct(examples.replace('A demo app.', 'A demo app for <audience>.')).find((item) => item.path === 'What it is');
+  assert.match(problem.message, /placeholder "<audience>"/);
+});
+
+test('every YAML placeholder problem quotes the offending text', () => {
+  const cases = [
+    validateBrief(sampleBrief.replace('goal: Show a successful result', 'goal: <The goal>')).find((item) => item.path === 'goal'),
+    validateStoryboard(YAML.stringify({ ...sampleStory, beats: [{ ...sampleStory.beats[0], say: '<The line>' }] })).find((item) => item.path === 'beats[0].say'),
+    validateWorld('source: <The repository>\n').find((item) => item.path === 'source' && /placeholder/.test(item.message)),
+    validateAudio('provider: clips\ndir: <The clips folder>\n').find((item) => item.path === 'dir' && /placeholder/.test(item.message)),
+  ];
+  for (const [index, problem] of cases.entries()) assert.match(problem?.message || '', /replace the placeholder "<[^>]+>" with real text/, String(index));
+});
+
+test('template requires every brief choice and next lists storyboard placeholders before lint', (t) => {
+  const dir = fixture(t);
+  assert.equal(cli(dir, 'init').status, 0);
+  const studio = path.join(dir, '.ghostcast');
+  fs.writeFileSync(path.join(studio, 'product.md'), sampleProduct);
+  const refused = cli(dir, 'template', 'how-to');
+  assert.equal(refused.status, 1);
+  for (const field of ['audience', 'goal', 'weight', 'type', 'cap', 'destinations', 'audio'])
+    assert.match(refused.stderr, new RegExp(field));
+  assert.equal(fs.existsSync(path.join(studio, 'storyboard.yaml')), false);
+  fs.writeFileSync(path.join(studio, 'brief.md'), sampleBrief);
+  assert.equal(cli(dir, 'template', 'how-to').status, 0);
+  const report = nextJson(dir);
+  assert.equal(report.stage, 'storyboard');
+  assert.match(report.next, /replace every placeholder in storyboard.yaml with real beats \(\d+ left\), then run `ghostcast lint`/);
+  assert.equal(report.problems.length, 9);
+  assert.match(report.problems[0].message, /placeholder "<[^>]+>"/);
+  assert.match(report.problems.at(-1).message, /and \d+ more/);
 });
 
 test('storyboard schema validates structure, actions, panels, scripts and placeholders with paths', () => {
@@ -355,7 +409,8 @@ test('each CLI storyboard template has only placeholder errors and can be filled
     assert.match(raw.split('\n')[0], /^# Frame:/);
     const story = YAML.parse(raw);
     assert.equal(story.video, path.basename(dir).toLowerCase());
-    assert.equal(story.cap, 120);
+    assert.equal(story.cap, undefined);
+    assert.match(raw, /the cap comes from brief\.md/);
     assert.equal(story.type, type);
     const placeholderReport = lint(studio);
     assert.ok(placeholderReport.errors.length > 0, type);
@@ -426,6 +481,24 @@ test('lint catches every rule and emits the documented JSON shape', (t) => {
   assert.ok(JSON.parse(bad.stdout).errors.some((p) => p.rule === 'word-budget' && p.line > 0));
 });
 
+test('lint rejects a storyboard cap over the brief and checks audio against the brief', (t) => {
+  const { studio } = init(t);
+  writeStory(studio, { ...sampleStory, cap: 121 });
+  const cap = lint(studio).errors.find((problem) => problem.rule === 'cap' && /storyboard's cap/.test(problem.message));
+  assert.equal(cap.message, "the storyboard's cap (121 s) is over the brief's (120 s)");
+  writeStory(studio, { ...sampleStory, cap: undefined });
+  fs.writeFileSync(path.join(studio, 'audio.yaml'), 'provider: clips\ndir: voiceover/\n');
+  assert.match(lint(studio).errors.find((problem) => problem.rule === 'audio').message, /clips.*none/);
+  fs.writeFileSync(path.join(studio, 'brief.md'), sampleBrief.replace('audio: none', 'audio: kokoro'));
+  fs.writeFileSync(path.join(studio, 'audio.yaml'), 'provider: kokoro\nvoice: af_heart\n');
+  assert.equal(lint(studio).errors.filter((problem) => problem.rule === 'audio').length, 0);
+  assert.match(lint(studio).warnings.find((problem) => problem.rule === 'audio').message,
+    /built-in speech is not available yet; the video will be silent until voice-over clips are placed/);
+  fs.writeFileSync(path.join(studio, 'brief.md'), sampleBrief.replace('audio: none', 'audio: elevenlabs'));
+  fs.writeFileSync(path.join(studio, 'audio.yaml'), 'provider: elevenlabs\nvoice: demo\n');
+  assert.ok(lint(studio).warnings.some((problem) => problem.rule === 'audio'));
+});
+
 test('sentence counting preserves decimals, versions, file names and abbreviations; word budget uses project speed', (t) => {
   const { studio } = init(t);
   const story = structuredClone(sampleStory);
@@ -461,7 +534,7 @@ test('the secrets scan reads the plan files and text under panels/ and scenes/ o
   const { studio } = init(t);
   writeStory(studio, { ...sampleStory, beats: [{ ...sampleStory.beats[0], say: 'Open scripts/generateInvoices/fixtures/northwind to see it.' }] });
   const token = 'sk-' + 'Abc123'.repeat(4);
-  for (const dir of ['raw/take/frames', 'out', '.ghostcast/chrome-profile']) {
+  for (const dir of ['raw/take/frames', 'out', 'cache/chrome-profile']) {
     fs.mkdirSync(path.join(studio, dir), { recursive: true });
     fs.writeFileSync(path.join(studio, dir, 'data.json'), JSON.stringify({ token }));
   }

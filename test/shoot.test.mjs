@@ -58,7 +58,7 @@ step('command shoot writes 1080p MP4 and compact GIF without touching source', (
   const r = run(process.execPath, [CLI, 'shoot', 'echo hello && ls']);
   good(r);
   assert.match(r.out, /command exit code: 0/);
-  assert.match(r.out, /source untouched during the shoot/);
+  assert.match(r.out, /source untouched/);
   for (const ext of ['mp4', 'gif']) fs.renameSync(path.join(repo, `echo-hello-ls.${ext}`), path.join(tmp, `echo-hello-ls.${ext}`));
   outputs('echo-hello-ls');
   assert.deepEqual(fingerprint(), before);

@@ -94,6 +94,11 @@ export function lint(dir) {
   }
   const brief = sources['brief.md'] ? readBrief(sources['brief.md']).data || {} : {};
   if (sources['storyboard.yaml']) for (const problem of validateStoryboard(sources['storyboard.yaml'], brief)) push('error', 'schema', problem);
+  const audio = sources['audio.yaml'] ? parseYaml(sources['audio.yaml'], 'audio.yaml').data : null;
+  if (brief.audio && audio?.provider && brief.audio !== audio.provider)
+    push('error', 'audio', { file: 'audio.yaml', path: 'provider', message: `audio.yaml provider (${audio.provider}) must match brief.md audio (${brief.audio})` });
+  if (['kokoro', 'elevenlabs'].includes(audio?.provider))
+    push('warning', 'audio', { file: 'audio.yaml', path: 'provider', message: 'built-in speech is not available yet; the video will be silent until voice-over clips are placed' });
   const parsed = sources['storyboard.yaml'] ? parseYaml(sources['storyboard.yaml'], 'storyboard.yaml') : null;
   const storyboard = parsed?.data && typeof parsed.data === 'object' && !Array.isArray(parsed.data) ? parsed.data : {};
   let wps = JSON.parse(fs.readFileSync(DEFAULTS, 'utf8')).voiceover.wordsPerSecond;
@@ -139,6 +144,8 @@ export function lint(dir) {
   });
   const total = estimates.reduce((sum, beat) => sum + beat.seconds, 0);
   const cap = storyboard.cap ?? brief.cap ?? null;
+  if (Number.isFinite(storyboard.cap) && Number.isFinite(brief.cap) && storyboard.cap > brief.cap)
+    push('error', 'cap', { file: 'storyboard.yaml', path: 'cap', line: parsed?.line(['cap']), message: `the storyboard's cap (${storyboard.cap} s) is over the brief's (${brief.cap} s)` });
   const panelShare = brief.panel_share ?? 0.2;
   if (placeholderBeats !== beats.length && total > 0) {
     const panelSeconds = estimates.reduce((sum, beat, i) => sum + (beats[i]?.surface === 'panel' ? beat.seconds : 0), 0);

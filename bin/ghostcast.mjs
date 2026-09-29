@@ -198,10 +198,11 @@ const commands = {
     fs.mkdirSync(dir, { recursive: true });
     for (const entry of fs.readdirSync(path.join(PKG, 'templates', 'studio'), { withFileTypes: true })) {
       const target = path.join(dir, entry.name === 'gitignore' ? '.gitignore' : entry.name);
-      if (fs.existsSync(target)) { console.log(`kept ${path.relative(process.cwd(), target)}`); continue; }
+      const label = path.relative(process.cwd(), target).replace(/\\/g, '/') + (entry.isDirectory() ? '/' : '');
+      if (fs.existsSync(target)) { console.log(`kept ${label}`); continue; }
       if (entry.isDirectory()) fs.mkdirSync(target);
       else fs.copyFileSync(path.join(PKG, 'templates', 'studio', entry.name), target);
-      console.log(`created ${path.relative(process.cwd(), target)}`);
+      console.log(`created ${label}`);
     }
     const git = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: path.dirname(dir), encoding: 'utf8' });
     if (git.status !== 0 || git.stdout.trim() !== 'true') console.warn('warning: this directory is not a git repository');
@@ -215,13 +216,11 @@ const commands = {
     const target = path.join(dir, 'storyboard.yaml');
     if (!fs.existsSync(path.join(dir, 'brief.md'))) die(`no brief.md in ${dir}; run ghostcast init first`);
     if (fs.existsSync(target) && !force) die(`${target} exists; pass --force to replace it`);
-    const { readBrief } = await import('../src/studio/schema.mjs');
-    const { data, problems } = readBrief(fs.readFileSync(path.join(dir, 'brief.md'), 'utf8'));
-    if (problems.length) die(`brief.md needs valid YAML front matter before a template can be written: ${problems[0].message}`);
-    if (!Number.isFinite(data?.cap) || data.cap < 10 || data.cap > 600) die('brief.md: set cap to a number from 10 to 600 seconds');
-    const cap = data.cap;
+    const { validateBrief } = await import('../src/studio/schema.mjs');
+    const problems = validateBrief(fs.readFileSync(path.join(dir, 'brief.md'), 'utf8'));
+    if (problems.length) die(`complete brief.md before writing a template:\n${problems.map((problem) => `  ${problem.path || 'brief.md'}: ${problem.message}`).join('\n')}`);
     const source = fs.readFileSync(path.join(PKG, 'templates', 'storyboards', `${type}.yaml`), 'utf8');
-    fs.writeFileSync(target, source.replace('__VIDEO__', slug(path.basename(path.dirname(dir)))).replace('__CAP__', String(cap)));
+    fs.writeFileSync(target, source.replace('__VIDEO__', slug(path.basename(path.dirname(dir)))));
     console.log(`wrote ${target}`);
   },
 

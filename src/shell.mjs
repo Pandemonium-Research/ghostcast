@@ -13,11 +13,13 @@ export function gitBash() {
   return candidates.find((c) => fs.existsSync(c)) || null;
 }
 
+// World setup runs in bash on every OS, as terminal beats do, so a storyboard written on one OS
+// sets up the same way on the others.
 export function runShell(command, { cwd, env = process.env } = {}) {
   return new Promise((resolve, reject) => {
-    const win = process.platform === 'win32';
-    const child = spawn(win ? process.env.ComSpec || 'cmd.exe' : '/bin/sh', win ? ['/d', '/s', '/c', command] : ['-c', command],
-      { cwd, env, stdio: 'inherit' });
+    const bash = process.platform === 'win32' ? gitBash() : '/bin/bash';
+    if (!bash || !fs.existsSync(bash)) { reject(new Error('world setup needs bash (on Windows, install Git for Windows)')); return; }
+    const child = spawn(bash, ['-c', command], { cwd, env, stdio: 'inherit' });
     child.once('error', reject);
     child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`world setup exited ${code}: ${command}`)));
   });

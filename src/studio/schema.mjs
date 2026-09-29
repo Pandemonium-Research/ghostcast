@@ -6,9 +6,10 @@ const text = (value) => typeof value === 'string' && value.trim().length > 0;
 // Commands and code legitimately hold "<" and ">" (redirection, HTML) and words like TODO, so for
 // those only a value that is nothing but a placeholder counts.
 const LITERAL = new Set(['run', 'cmd', 'code']);
-export const placeholder = (value, key) => typeof value === 'string' && (LITERAL.has(key)
-  ? /^\s*(?:<[^<>]+>|TODO)\s*$/i.test(value)
-  : /<[^<>]+>/.test(value) || /\bTODO\b/i.test(value));
+const placeholderText = (value, key) => typeof value !== 'string' ? null : LITERAL.has(key)
+  ? /^\s*(<[^<>]+>|TODO)\s*$/i.exec(value)?.[1] || null
+  : /<[^<>]+>|\bTODO\b/i.exec(value)?.[0] || null;
+export const placeholder = (value, key) => placeholderText(value, key) !== null;
 export function hasPlaceholder(value, key, seen = new WeakSet()) {
   if (placeholder(value, key)) return true;
   if (!value || typeof value !== 'object' || seen.has(value)) return false;
@@ -53,14 +54,21 @@ function checker(file, parsed) {
   };
   const seen = new WeakSet();
   const scan = (value, parts = []) => {
-    if (placeholder(value, parts.findLast((part) => typeof part === 'string'))) add(parts, 'replace the placeholder with real text');
+    const offending = placeholderText(value, parts.findLast((part) => typeof part === 'string'));
+    if (offending) add(parts, `replace the placeholder ${JSON.stringify(offending)} with real text`);
     else if (value && typeof value === 'object' && !seen.has(value)) {
       seen.add(value);
       if (list(value)) value.forEach((item, i) => scan(item, [...parts, i]));
       else if (object(value)) Object.entries(value).forEach(([key, item]) => scan(item, [...parts, key]));
     }
   };
-  return { problems, add, known, required, enumValue, scan };
+  // A field still holding a placeholder gets one problem, the placeholder, not also "choose one of".
+  const done = () => {
+    const holes = problems.filter((p) => p.message.startsWith('replace the placeholder')).map((p) => p.path);
+    const inside = (p, hole) => p === hole || p.startsWith(`${hole}.`) || p.startsWith(`${hole}[`);
+    return problems.filter((p) => p.message.startsWith('replace the placeholder') || !holes.some((hole) => inside(p.path, hole)));
+  };
+  return { problems, add, known, required, enumValue, scan, done };
 }
 
 export function readBrief(source) {
@@ -73,7 +81,7 @@ export function validateBrief(source) {
   const parsed = readBrief(source);
   const c = checker('brief.md', parsed);
   const data = parsed.data;
-  if (!c.known(data, ['audience', 'goal', 'weight', 'type', 'cap', 'destinations', 'audio', 'panel_share'])) return c.problems;
+  if (!c.known(data, ['audience', 'goal', 'weight', 'type', 'cap', 'destinations', 'audio', 'panel_share'])) return c.done();
   for (const key of ['audience', 'goal']) c.required(data[key], [key]);
   c.enumValue(data.weight, ['quick', 'standard', 'production'], ['weight']);
   c.enumValue(data.type, ['launch', 'how-to', 'feature', 'receipt'], ['type']);
@@ -83,7 +91,7 @@ export function validateBrief(source) {
   c.enumValue(data.audio, ['kokoro', 'elevenlabs', 'clips', 'none'], ['audio']);
   if (data.panel_share !== undefined && (typeof data.panel_share !== 'number' || data.panel_share < 0 || data.panel_share > 1)) c.add(['panel_share'], 'set a number from 0 to 1');
   c.scan(data);
-  return c.problems;
+  return c.done();
 }
 
 export function validateProduct(source) {
@@ -94,7 +102,19 @@ export function validateProduct(source) {
   const lines = source.split(/\r?\n/);
   const sections = new Map();
   let heading = null;
+  let documentFence = null;
   for (let i = 0; i < lines.length; i++) {
+    const marker = /^ {0,3}(`{3,}|~{3,})/.exec(lines[i])?.[1];
+    if (documentFence) {
+      if (marker?.[0] === documentFence[0] && marker.length >= documentFence.length && /^[ \t]*(`+|~+)[ \t]*$/.test(lines[i])) documentFence = null;
+      if (heading) sections.get(heading).body += lines[i] + '\n';
+      continue;
+    }
+    if (marker) {
+      documentFence = marker;
+      if (heading) sections.get(heading).body += lines[i] + '\n';
+      continue;
+    }
     const match = /^##\s+(.+?)\s*$/.exec(lines[i]);
     if (match) { heading = match[1]; sections.set(heading, { line: i + 1, body: '' }); }
     else if (heading) sections.get(heading).body += lines[i] + '\n';
@@ -104,7 +124,19 @@ export function validateProduct(source) {
     const path = name;
     if (!section) { problems.push({ file, path, message: `add a ## ${name} heading` }); continue; }
     const body = section.body.replace(/<!--[\s\S]*?-->/g, '').trim();
-    if (!body || placeholder(body)) problems.push({ file, path, line: section.line, message: 'replace the guidance with real text; "none needed" is valid' });
+    let fence = null;
+    const prose = body.split(/\r?\n/).map((line) => {
+      const marker = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+      if (fence) {
+        if (marker?.[0] === fence[0] && marker.length >= fence.length && /^[ \t]*(`+|~+)[ \t]*$/.test(line)) fence = null;
+        return '';
+      }
+      if (marker) { fence = marker; return ''; }
+      return line;
+    }).join('\n').replace(/(`+)[\s\S]*?\1/g, '');
+    const offending = placeholderText(prose);
+    if (!body) problems.push({ file, path, line: section.line, message: 'replace the guidance with real text; "none needed" is valid' });
+    else if (offending) problems.push({ file, path, line: section.line, message: `replace the placeholder ${JSON.stringify(offending)} with real text` });
     if (name === 'Flows worth showing' && body && !/^\s*[-*+]\s+\S/m.test(body)) problems.push({ file, path, line: section.line, message: 'add at least one bullet for a flow worth showing' });
   }
   return problems;
@@ -119,13 +151,13 @@ export function validateStoryboard(source, brief = {}) {
   const parsed = parseYaml(source, 'storyboard.yaml');
   const c = checker('storyboard.yaml', parsed);
   const data = parsed.data;
-  if (!c.known(data, ['video', 'weight', 'type', 'cap', 'beats'])) return c.problems;
+  if (!c.known(data, ['video', 'weight', 'type', 'cap', 'beats'])) return c.done();
   if (!text(data.video) || !/^[a-z][a-z0-9_-]*$/.test(data.video)) c.add(['video'], 'use a video slug starting with a letter');
   c.enumValue(data.weight ?? brief.weight, ['quick', 'standard', 'production'], ['weight']);
   c.enumValue(data.type ?? brief.type, ['launch', 'how-to', 'feature', 'receipt'], ['type']);
   const cap = data.cap ?? brief.cap;
   if (!seconds(cap) || cap < 10 || cap > 600) c.add(['cap'], 'set a cap from 10 to 600 seconds');
-  if (!list(data.beats) || !data.beats.length) { c.add(['beats'], 'add at least one beat'); return c.problems; }
+  if (!list(data.beats) || !data.beats.length) { c.add(['beats'], 'add at least one beat'); return c.done(); }
   const ids = new Set();
   data.beats.forEach((beat, i) => {
     const root = ['beats', i];
@@ -169,13 +201,13 @@ export function validateStoryboard(source, brief = {}) {
     }
     c.scan(beat, root);
   });
-  return c.problems;
+  return c.done();
 }
 
 export function validateWorld(source) {
   const parsed = parseYaml(source, 'world.yaml');
   const c = checker('world.yaml', parsed), world = parsed.data;
-  if (!c.known(world, ['source', 'mode', 'ref', 'copy', 'link', 'setup', 'services'])) return c.problems;
+  if (!c.known(world, ['source', 'mode', 'ref', 'copy', 'link', 'setup', 'services'])) return c.done();
   c.required(world.source, ['source'], 'a path to the source repository');
   c.enumValue(world.mode, ['snapshot', 'commit'], ['mode'], true);
   if (world.ref !== undefined && !text(world.ref)) c.add(['ref'], 'use a git ref');
@@ -201,18 +233,18 @@ export function validateWorld(source) {
     });
   }
   c.scan(world);
-  return c.problems;
+  return c.done();
 }
 
 export function validateAudio(source) {
   const parsed = parseYaml(source, 'audio.yaml');
   const c = checker('audio.yaml', parsed), audio = parsed.data;
-  if (!c.known(audio, ['provider', 'voice', 'dir'])) return c.problems;
+  if (!c.known(audio, ['provider', 'voice', 'dir'])) return c.done();
   c.enumValue(audio.provider, ['kokoro', 'elevenlabs', 'clips', 'none'], ['provider']);
   if (['kokoro', 'elevenlabs'].includes(audio.provider)) c.required(audio.voice, ['voice'], 'a voice name');
   else if (audio.voice !== undefined && !text(audio.voice)) c.add(['voice'], 'use a voice name');
   if (audio.provider === 'clips') c.required(audio.dir, ['dir'], 'a clips directory');
   else if (audio.dir !== undefined && !text(audio.dir)) c.add(['dir'], 'use a clips directory');
   c.scan(audio);
-  return c.problems;
+  return c.done();
 }

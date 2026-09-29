@@ -71,6 +71,7 @@ test('snapshot copies edits and untracked files; reset and git commands stay in 
   const index = fs.readFileSync(path.join(f.source, '.git', 'index'));
   const world = await prepareWorld(f.project);
   try {
+    assert.equal(world.profile, path.join(f.root, 'cache', 'world-profiles', path.basename(world.dir)));
     assert.equal(fs.readFileSync(path.join(world.dir, 'app.txt'), 'utf8'), 'uncommitted\n');
     assert.equal(fs.readFileSync(path.join(world.dir, 'extra.txt'), 'utf8'), 'untracked\n');
     assert.equal(fs.readFileSync(path.join(world.dir, '.env'), 'utf8'), 'SECRET=test\n');
@@ -100,7 +101,7 @@ test('a concurrent source edit survives and is reported without failing', async 
   const original = console.log;
   console.log = (s) => lines.push(s);
   try { assert.equal(await world.dispose(), true); } finally { console.log = original; }
-  assert.match(lines.join('\n'), /changed during the shoot: app\.txt/);
+  assert.match(lines.join('\n'), /changed in the source meanwhile: app\.txt/);
   assert.equal(fs.readFileSync(path.join(f.source, 'app.txt'), 'utf8'), 'user edit during shoot\n');
 });
 
@@ -175,7 +176,7 @@ test('record fails when a scene writes through world.link', (t) => {
   const r = recordScene(f, "import fs from 'node:fs'; import path from 'node:path'; export default async function (h) { fs.writeFileSync(path.join(h.world.dir, 'node_modules', 'leak.txt'), 'leaked'); }\n");
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /wrote through world\.link node_modules: .*leak\.txt/);
-  assert.doesNotMatch(r.out, /source untouched during the shoot/);
+  assert.doesNotMatch(r.out, /source untouched/);
   assert.equal(fs.readFileSync(path.join(f.source, 'node_modules', 'leak.txt'), 'utf8'), 'leaked');
 });
 
@@ -193,7 +194,7 @@ export default async function (h) {
 }
 `);
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /source untouched during the shoot/);
+  assert.match(r.out, /source untouched/);
   assert.equal(fs.readFileSync(path.join(f.source, 'node_modules', 'marker'), 'utf8'), 'untouched dependency\n');
   assert.equal(fs.readFileSync(path.join(f.source, 'app.txt'), 'utf8'), 'uncommitted\n');
 });
@@ -204,8 +205,8 @@ test('record excludes a ghostcast project nested in the source', (t) => {
   git(f.source, 'commit', '-m', 'track project config');
   const r = recordScene(f, "import fs from 'node:fs'; import path from 'node:path'; export default async function (h) { if (fs.existsSync(path.join(h.world.dir, '.ghostcast'))) throw new Error('project copied into world'); fs.writeFileSync(path.join(h.project.root, 'shoot-log.txt'), 'project output'); }\n");
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /source untouched during the shoot/);
-  assert.doesNotMatch(r.out, /changed during the shoot:.*\.ghostcast/);
+  assert.match(r.out, /source untouched/);
+  assert.doesNotMatch(r.out, /changed in the source meanwhile:.*\.ghostcast/);
   assert.equal(fs.existsSync(path.join(f.root, 'shoot-log.txt')), true);
 });
 
@@ -225,4 +226,17 @@ test('a port lock from an exited process is reused', async (t) => {
   try { assert.equal(world.port('web'), port); }
   finally { assert.equal(await world.dispose(), true); }
   assert.equal(fs.existsSync(path.join(lockDir, String(port))), false);
+});
+
+test('setup runs in bash in the copy, once, and resets return to its result', async (t) => {
+  // [[ ]] and $(( )) are bash, not cmd.exe or a plain sh: setup behaves the same on every OS.
+  const f = fixture(t, { setup: ['[[ -f app.txt ]] && echo "$((2 + 3))" > seeded.txt'] });
+  const world = await prepareWorld(f.project);
+  try {
+    assert.equal(fs.readFileSync(path.join(world.dir, 'seeded.txt'), 'utf8'), '5\n');
+    fs.writeFileSync(path.join(world.dir, 'seeded.txt'), 'changed by a take\n');
+    world.reset();
+    assert.equal(fs.readFileSync(path.join(world.dir, 'seeded.txt'), 'utf8'), '5\n');
+    assert.ok(!fs.existsSync(path.join(f.source, 'seeded.txt')), 'setup ran in the copy, not the source');
+  } finally { assert.equal(await world.dispose(), true); }
 });

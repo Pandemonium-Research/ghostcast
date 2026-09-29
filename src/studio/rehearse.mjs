@@ -94,7 +94,7 @@ export async function rehearse(project, { ids = [], runs = 3, headed = false } =
   fs.writeFileSync(path.join(project.root, 'cache', 'rehearsal.json'), JSON.stringify(report, null, 2) + '\n');
   const passing = entries.filter((entry) => entry.status === 'pass').length;
   console.log(`rehearse · ${passing} of ${entries.length} beats pass (${runs} runs)`);
-  console.log('  services stay running between runs');
+  console.log('  each run starts from a fresh copy of the source; services keep running between runs');
   for (const entry of entries) {
     if (entry.status === 'unconfirmed') console.log(`  ? ${entry.id.padEnd(8)} unconfirmed (reached in ${entry.reached} of ${runs}, passed each time)`);
     else if (entry.status !== 'pass') console.log(`  ✗ ${entry.id.padEnd(8)} ${entry.status} (${entry.passes} of ${runs})${entry.errors.length ? `: ${entry.errors.join('; ')}` : ''}`);

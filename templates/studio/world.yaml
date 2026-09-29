@@ -1,13 +1,23 @@
 source: ..
 mode: snapshot
 
-# The fields below mirror templates/project/world.example.json.
+# source is the repository to copy, relative to .ghostcast/; .. is its parent.
+# snapshot copies the current working tree, including uncommitted and untracked files.
+# For git repositories, git-ignored files are excluded. commit requires Git and checks out ref.
+# ref: main
+# copy adds git-ignored files or folders, such as .env or node_modules.
 # copy:
 #   - .env
+# link shares large read-only folders instead of copying them; writing through a link fails the shoot.
 # link:
 #   - node_modules
+# setup runs bash commands (Git Bash on Windows) once in each new copy; resets return to their result.
 # setup:
 #   - npm run seed
+# services are long-running processes. port: true allocates a free PORT environment variable.
+# ${PORT} in ready.url uses that port. ready waits for a url, log line or port.
+# timeout is in milliseconds; omitted or zero means 30000.
+# A storyboard open: /path uses the first service with port: true.
 # services:
 #   - name: web
 #     cmd: npm run dev

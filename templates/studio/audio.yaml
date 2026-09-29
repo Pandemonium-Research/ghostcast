@@ -1,10 +1,11 @@
-provider: kokoro
-voice: af_heart
+provider: none
 
-# ElevenLabs reads ELEVENLABS_API_KEY from the environment; never put a key here.
-# provider: elevenlabs
-# voice: <ElevenLabs voice ID>
-
-# For your own recordings:
+# For your own voice-over clips, place them with `ghostcast pauses` and `ghostcast vo-mix`:
 # provider: clips
 # dir: voiceover/
+
+# Built-in speech from kokoro and elevenlabs arrives in a later version.
+# provider: kokoro
+# voice: <voice name>
+# provider: elevenlabs
+# voice: <ElevenLabs voice ID>

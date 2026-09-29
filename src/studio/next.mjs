@@ -90,6 +90,13 @@ export function next(dir) {
 
   const lintReport = lint(dir);
   const warnings = lintReport.warnings.length;
+  const placeholders = lintReport.errors.filter((problem) => problem.file === 'storyboard.yaml' && /replace the placeholder/.test(problem.message));
+  if (placeholders.length) {
+    const problems = placeholders.slice(0, 8).map(lintIssue);
+    if (placeholders.length > 8) problems.push({ message: `and ${placeholders.length - 8} more` });
+    return result('storyboard', `${placeholders.length} placeholder${placeholders.length === 1 ? '' : 's'} left`,
+      `replace every placeholder in storyboard.yaml with real beats (${placeholders.length} left), then run \`ghostcast lint\``, problems, warnings);
+  }
   if (lintReport.errors.length) {
     const count = lintReport.errors.length;
     const problems = lintReport.errors.slice(0, 8).map(lintIssue);
@@ -98,23 +105,6 @@ export function next(dir) {
   }
 
   const currentHash = storyboardHash(dir);
-  const approvalFile = path.join(dir, 'approvals.json');
-  let approvedHash;
-  try { approvedHash = JSON.parse(read(approvalFile))?.storyboard?.sha256; } catch {}
-  const estimate = lintReport.estimate;
-  const runtime = `${estimate.total.toFixed(1)} s / ${estimate.cap ?? '?'} s cap`;
-  const approve = (changes) => result('approve', `${approvedHash ? 'storyboard changed since approval' : 'storyboard awaits approval'}: ${runtime}${warningSuffix(warnings)}`,
-    `show the user each beat (what it shows and says) and the estimated runtime (${runtime}); when they approve, run \`ghostcast approve storyboard\``, changes.problems, warnings);
-  // Fixing how beats are performed, as rehearsal failures need, does not stop the next rehearsal;
-  // the approval is still reopened, and asked for again before the shoot.
-  let pending = null;
-  if (approvedHash !== currentHash) {
-    const approvedCopy = path.join(dir, 'cache', 'approved', 'storyboard.yaml');
-    const changes = approvedHash && fs.existsSync(approvedCopy) ? storyboardChanges(read(approvedCopy), read(storyboardFile)) : { problems: [], mechanicsOnly: false };
-    if (!changes.mechanicsOnly) return approve(changes);
-    pending = changes;
-  }
-
   const rehearsalFile = path.join(dir, 'cache', 'rehearsal.json');
   let rehearsal;
   try { rehearsal = JSON.parse(read(rehearsalFile)); } catch {}
@@ -122,7 +112,18 @@ export function next(dir) {
     return result('rehearse', `${rehearsal ? 'rehearsal is stale' : 'no rehearsal'}${warningSuffix(warnings)}`, 'run `ghostcast rehearse`', [], warnings);
   const story = parseYaml(read(storyboardFile), 'storyboard.yaml').data;
   const rehearsed = rehearsalResult(rehearsal, story.beats.map((beat) => beat.id), warnings);
-  return rehearsed.stage === 'shoot' && pending ? approve(pending) : rehearsed;
+  if (rehearsed.stage !== 'shoot') return rehearsed;
+
+  const approvalFile = path.join(dir, 'approvals.json');
+  let approvedHash;
+  try { approvedHash = JSON.parse(read(approvalFile))?.storyboard?.sha256; } catch {}
+  if (approvedHash === currentHash) return rehearsed;
+  const approvedCopy = path.join(dir, 'cache', 'approved', 'storyboard.yaml');
+  const changes = approvedHash && fs.existsSync(approvedCopy) ? storyboardChanges(read(approvedCopy), read(storyboardFile)) : { problems: [] };
+  const estimate = lintReport.estimate;
+  const runtime = `${estimate.total.toFixed(1)} s / ${estimate.cap ?? '?'} s cap`;
+  return result('approve', `${approvedHash ? 'storyboard changed since approval' : 'storyboard awaits approval'}: ${runtime}${warningSuffix(rehearsed.warnings)}`,
+    `show the user each beat (what it shows and says) and the estimated runtime (${runtime}); when they approve, run \`ghostcast approve storyboard\``, changes.problems, rehearsed.warnings);
 }
 
 export function formatNext(report) {

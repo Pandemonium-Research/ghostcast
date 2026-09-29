@@ -1,9 +1,8 @@
 # Frame: name the problem, reveal the product, prove two or three capabilities, then invite action.
-# Aim for 60 to 90 seconds; cap is copied from brief.md.
+# Aim for 60 to 90 seconds; the cap comes from brief.md.
 video: __VIDEO__
 weight: production
 type: launch
-cap: __CAP__
 beats:
   - id: hook
     surface: panel

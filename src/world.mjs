@@ -125,13 +125,13 @@ export function checkUntouched(source, before, dir, report = console) {
     [...new Set([...Object.keys(before.linked[link]), ...Object.keys(after.linked[link])])]
       .filter((rel) => before.linked[link][rel] !== after.linked[link][rel]).sort()]));
   const linkedChanged = Object.entries(linked).filter(([, files]) => files.length);
-  if (changed.length) report.log(`changed during the shoot: ${changed.join(', ')}`);
+  if (changed.length) report.log(`changed in the source meanwhile: ${changed.join(', ')}`);
   else if (!linkedChanged.length && before.status === after.status && before.refs === after.refs && before.stash === after.stash && before.worktrees === after.worktrees)
-    report.log('source untouched during the shoot');
-  else if (before.status !== after.status) report.log('source index/status changed during the shoot');
+    report.log('source untouched');
+  else if (before.status !== after.status) report.log('source index/status changed meanwhile');
   const leaks = changed.filter((rel) => after.files[rel] !== null && after.files[rel] === hash(path.join(dir, rel)));
   const metadata = ['refs', 'stash', 'worktrees'].filter((key) => before[key] !== after[key]);
-  if (metadata.length) report.error(`source ${metadata.join(', ')} changed during the shoot`);
+  if (metadata.length) report.error(`source ${metadata.join(', ')} changed meanwhile`);
   for (const [link, files] of linkedChanged) report.error(`wrote through world.link ${link}: ${files.join(', ')}`);
   if (leaks.length) report.error(`write leaked out of the copy: ${leaks.join(', ')}`);
   return { changed, leaks, metadata, linked, ok: !leaks.length && !metadata.length && !linkedChanged.length };
@@ -229,7 +229,7 @@ export function openWorld(dir) {
   if (!/^[0-9a-f]{12}$/.test(id) || path.resolve(path.dirname(dir)) !== path.resolve(worldsDir())) throw new Error(`invalid world directory: ${dir}`);
   const meta = JSON.parse(fs.readFileSync(`${dir}.json`, 'utf8'));
   const { source, links, ports } = meta;
-  const profile = path.join(meta.projectRoot, '.ghostcast', 'world-profiles', id);
+  const profile = path.join(meta.projectRoot, 'cache', 'world-profiles', id);
   const reset = () => {
     // Unlink first: neither git clean nor recursive removal may traverse a user-owned target.
     for (const rel of links) remove(resolveIn(dir, rel));
@@ -283,7 +283,7 @@ export async function prepareWorld(project, { keep = false } = {}) {
   fs.mkdirSync(dir);
   const ports = {};
   const serviceNames = new Set();
-  const profile = path.join(projectRoot, '.ghostcast', 'world-profiles', path.basename(dir));
+  const profile = path.join(projectRoot, 'cache', 'world-profiles', path.basename(dir));
   const locks = [];
   const children = [];
   let checked = false;

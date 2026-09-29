@@ -1,9 +1,8 @@
 # Frame: make one claim, show direct evidence, then give one line of context for a PR or changelog.
-# Aim for 20 to 45 seconds; cap is copied from brief.md.
+# Aim for 20 to 45 seconds; the cap comes from brief.md.
 video: __VIDEO__
 weight: quick
 type: receipt
-cap: __CAP__
 beats:
   - id: claim
     surface: terminal

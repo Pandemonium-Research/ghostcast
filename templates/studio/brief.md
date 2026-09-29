@@ -1,12 +1,11 @@
 ---
 audience: <Who should watch>
 goal: <What should they be able to do or believe>
-weight: standard
-type: how-to
-cap: 120
-destinations: [docs]
-audio: kokoro
-panel_share: 0.2
+weight: <quick, standard or production>
+type: <launch, how-to, feature or receipt>
+cap: <seconds, from 10 to 600>
+destinations: <a list from readme, docs, social, talk and pr>
+audio: <none, clips, kokoro or elevenlabs>
 ---
 
 # Notes

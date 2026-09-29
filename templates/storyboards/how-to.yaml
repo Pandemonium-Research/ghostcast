@@ -1,9 +1,8 @@
 # Frame: state the goal, prepare the viewer, show each step, verify the result, and point onward.
-# Aim for 90 to 180 seconds; cap is copied from brief.md.
+# Aim for 90 to 180 seconds; the cap comes from brief.md.
 video: __VIDEO__
 weight: standard
 type: how-to
-cap: __CAP__
 beats:
   - id: title
     surface: panel

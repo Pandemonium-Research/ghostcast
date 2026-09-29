@@ -59,6 +59,7 @@ step('three dry runs report a flaky beat and leave the source untouched', () => 
   assert.equal(result.code, 1, result.out);
   assert.match(result.out, /flaky\s+flaky \(2 of 3\): second run failed/);
   assert.match(result.out, /3 of 4 beats pass \(3 runs\)/);
+  assert.match(result.out, /each run starts from a fresh copy of the source; services keep running between runs/);
   const report = JSON.parse(fs.readFileSync(path.join(studio, 'cache', 'rehearsal.json'), 'utf8'));
   assert.deepEqual(Object.keys(report), ['storyboardHash', 'at', 'runs', 'partial', 'servicesRestarted', 'beats']);
   assert.equal(report.storyboardHash, crypto.createHash('sha256').update(fs.readFileSync(path.join(studio, 'storyboard.yaml'))).digest('hex'));
@@ -71,6 +72,8 @@ step('three dry runs report a flaky beat and leave the source untouched', () => 
   assert.equal(report.beats[3].reached, 3);
   assert.equal(report.beats[3].ms.length, 3);
   assert.ok(fs.existsSync(path.join(studio, 'cache', 'rehearsal', '2-flaky.png')));
+  assert.equal(fs.existsSync(path.join(studio, '.ghostcast')), false);
+  assert.equal(fs.existsSync(path.join(studio, 'chrome-profile')), false);
   assert.deepEqual(fingerprint(), before);
 });
 

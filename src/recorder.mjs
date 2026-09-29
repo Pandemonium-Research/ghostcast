@@ -33,7 +33,7 @@ export { loadProject } from './project.mjs';
 
 export async function launch(project, { headed = false, world = null } = {}) {
   const { width, height, dpr } = project.config.viewport;
-  const ctx = await chromium.launchPersistentContext(world ? world.profile : path.join(project.root, '.ghostcast', 'chrome-profile'), {
+  const ctx = await chromium.launchPersistentContext(world ? world.profile : path.join(project.root, 'cache', 'chrome-profile'), {
     channel: project.config.browser?.channel ?? 'chrome',
     headless: !headed,
     viewport: { width, height },

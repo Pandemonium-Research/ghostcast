@@ -1,9 +1,8 @@
 # Frame: show the old context, use the feature, reveal its payoff, then show where to find it.
-# Aim for 45 to 90 seconds; cap is copied from brief.md.
+# Aim for 45 to 90 seconds; the cap comes from brief.md.
 video: __VIDEO__
 weight: standard
 type: feature
-cap: __CAP__
 beats:
   - id: context
     surface: web
