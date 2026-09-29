@@ -59,7 +59,7 @@ to. Focus the heading, the line, or the row.
 
 | Call | What it does |
 |---|---|
-| `await h.terminal.open(folder, {fontSize, padding})` | Opens a local xterm page on a real bash shell in `folder` (relative to the project, or absolute). Uses `vscode/shell.bashrc`, fills the viewport, and waits for the `$` prompt. Default font size is 24 px (about 90 columns) with 30 px padding; the pointer is hidden. No VS Code server or port is needed. |
+| `await h.terminal.open(folder, {fontSize, padding})` | Opens a local xterm page on a real bash shell in `folder` (relative to the world copy when configured, otherwise the project; absolute paths also work). Defaults to the world root or project root. Uses `vscode/shell.bashrc` and waits for the `$` prompt. |
 | `await h.vscode.open(folder, {sidebar, maximize})` | Loads VS Code on a folder (relative to the project, or absolute) and gives it a fresh, cleared terminal. `sidebar: false` hides both side bars. The panel is maximized by default. |
 | `await h.run(cmd, {cps, after, timeout, ps})` | Types the command and checks it reached the terminal (fails the take if not), then presses Enter and waits for the bare `$` prompt. `timeout` is in ms (default 60 000). |
 | `await h.waitFor(/regex/, timeout)` | Waits until the terminal's text matches, e.g. for a TUI (an agent CLI) that has no `$` prompt. |
@@ -87,8 +87,32 @@ to. Focus the heading, the line, or the row.
 | `h.guardFiles('path', …)` | Snapshots files, which are restored when the take ends, however it ends. |
 | `h.editFile('path', [[from, to], …])` | Replaces exact strings (each must occur exactly once), keeping line endings. |
 
-Paths are relative to the project. For repositories, prefer a reset in `setup`
-(`git reset --hard && git clean -fd` through `child_process`), so every retake starts identical.
+With `project.json`'s `world` configured, file paths are relative to `h.world.dir`.
+The helpers refuse absolute paths into `world.source`, including paths through a link.
+Without a world, paths remain relative to the project.
+
+## Isolated world
+
+Set `world.source` in `project.json` to the product checkout (relative to the ghostcast project,
+or absolute). A configured world is prepared before `record`, or once for all takes in `all`.
+The ghostcast project may live inside the product checkout, such as `source/.ghostcast/`; its
+directory is excluded from the world copy and source change check. The source cannot live inside
+the ghostcast project.
+The default `snapshot` mode includes tracked edits and untracked files; `commit` mode uses `ref`.
+See `templates/project/world.example.json` for copy, link, setup and service examples.
+
+Use `world.link` only for dependencies that scenes read. Writes inside a linked directory fail the
+shoot. For installs, use `world.setup` and put the dependency directory in `world.copy` instead.
+
+| Call | What it does |
+|---|---|
+| `h.world.dir` | Absolute path of this shoot's disposable copy. Pass it to `h.terminal.open()` or `h.vscode.open()`; both also default to it. |
+| `h.world.port('web')` | Port allocated for a named service with `port: true`. |
+| `h.world.url('web', '/health')` | Local URL for the service; the path defaults to `/`. |
+| `h.world.reset()` | Restores the copy to the prepared snapshot, removing scene edits. Linked directories are unlinked before cleaning, then recreated. |
+
+`h.world` is `null` when no world is configured. With a world, terminal and editor folders are
+relative to its copy. Use `h.world.url(name)` for browser scenes; service ports change each shoot.
 
 ## Other
 

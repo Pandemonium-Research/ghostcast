@@ -39,13 +39,21 @@ building anything. Then map it:
    - Terminal takes use `h.terminal.open('workspace')` in scene setup. They need bash (Git Bash
      on Windows) and do not need VS Code or its server license.
 2. **Prepare the world the demo happens in.**
+   - For a product checkout, set `project.json`'s `world.source` to its directory. The default
+     snapshot includes current tracked edits and untracked files; use `mode: "commit"` and `ref`
+     for a committed revision. See `templates/project/world.example.json`.
+   - Put ignored files needed by the demo in `world.copy`; use `world.link` only for large
+     read-only directories: a write through a link reaches the source, and the shoot fails.
+   - Declare local servers in `world.services`, give them `port: true` and a readiness check,
+     and open them with `h.world.url(name)`. Use `h.world.reset()` for a retake. `record` creates
+     one copy per shoot; `all` shares one copy and resets for each take. `--keep-world` keeps it
+     for inspection.
    - Use real projects with real names, in ordinary places. Don't use `demo/` or `test123`.
    - Use a clean shell: `vscode/shell.bashrc` has a `$` prompt, no history and no personal
      config.
    - Put keys in `vscode/secrets.env` and never show them.
    - Send traffic to local services rather than production when the user asks for that.
-   - Write a reset step for anything a take changes, so every retake starts identical. Use a
-     scene `setup`, `h.guardFiles`, or `git reset` in setup.
+   - Use the world reset for anything a take changes so every retake starts identical.
 3. **Write a scene per take** in `scenes/<take>.mjs`. See `docs/scene-api.md` for the helpers,
    and the template's scenes for the patterns.
 4. **Record, then look.**

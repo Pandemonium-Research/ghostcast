@@ -84,6 +84,9 @@ check first.
   folder. Past Windows' 260-character limit the terminal fails to start ("Cannot find
   conpty.dll"). The shared folder is short by default; `doctor` checks it, and `GHOSTCAST_CACHE`
   moves it.
+- **World path length.** Copies live under the short shared cache path, in `worlds/<run id>`.
+  `doctor` reports that path and warns if it leaves too little room for nested project files.
+  Set `GHOSTCAST_CACHE` to a short path if needed.
 - **The first load sometimes fails.** This happens when takes run back to back, and on a
   server's very first start, while it is still unpacking. `vscode.open` reloads once, and
   `ghostcast all` retries a failed take once.
@@ -150,3 +153,22 @@ check first.
   shifts what runs next. `ghostcast all` is Node and safe; your own batch scripts may not be.
 - **A failed take leaves partial frames in `raw/`.** Never cut them as if they were new.
   `ghostcast all` does not; if you script your own batch, check the exit code first.
+
+## Isolated worlds
+
+- **Ignored files and dependencies.** A world snapshot includes tracked and untracked files
+  that git does not ignore. List an ignored file in `world.copy` to copy it, or an ignored
+  directory in `world.link` to link it. Windows uses a junction; macOS and Linux use a symlink.
+  `world.link` is for dependencies that scenes only read. A linked directory is shared with the
+  source; any addition, removal or metadata change inside it fails the shoot. Run installs in
+  `world.setup` with that directory copied via `world.copy`, not linked.
+- **Reset and clean.** `h.world.reset()` unlinks configured directories first, runs
+  `git reset --hard` and `git clean -fdx` in the copy, restores the snapshot, then recreates
+  links. A scene's own `git clean -fdx` may remove a link but does not clean its target.
+- **Ports.** A service with `port: true` receives `PORT` and
+  `GHOSTCAST_PORT_<UPPERCASE_NAME>`. Use `h.world.url(name)` in scenes. Services start from the
+  copy, keep logs under the ghostcast project's `logs/`, and stop after the shoot. A readiness
+  URL can use `${PORT}`.
+- **Source edits during a shoot.** They survive and are reported. The shoot fails if a changed
+  source file matches the copy's content at that path, or refs, stash or worktree registration
+  changed. Writes through `world.link` fail the shoot and name the changed files.

@@ -13,7 +13,7 @@ as work lands.
 |---|---|---|---|
 | 0 | [Groundwork](#stage-0--groundwork) | — | Done: see [docs/bakeoff.md](docs/bakeoff.md) |
 | 1 | [One-command install](#stage-1--one-command-install) | 0 | In progress: Node post-production done |
-| 2 | [Isolation](#stage-2--isolation) | 1 | Not started |
+| 2 | [Isolation](#stage-2--isolation) | 1 | Done on Windows (Linux and macOS with stage 1) |
 | 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Not started |
 | 4 | [Plan](#stage-4--plan) | 2 | Not started |
 | 5 | [Direction](#stage-5--direction) | 4 | Not started |
@@ -203,6 +203,25 @@ Done when:
 ## Stage 2 · Isolation
 
 **Goal:** promise 2: a shoot never touches your work.
+
+Progress (Windows):
+
+- **Done:** `project.json` declares an optional `world`. Git sources are cloned under the short
+  cache path (`git clone --shared --no-checkout`), then set to a snapshot of the working tree
+  (uncommitted and untracked files included) or to a commit; other sources are copied. Ignored
+  files can be copied and ignored directories linked; resets remove links before cleaning.
+  Services get allocated ports, readiness checks, logs and process-tree teardown. `record` owns
+  one world; `all` shares one and resets it before each take. A project inside the source (the
+  future `.ghostcast/`) is left out of the copy and the checks.
+- **The untouched check** compares the source's status, content hashes, refs, stash and
+  worktrees, and walks every linked directory. It reports your own edits during a shoot without
+  failing, and fails on a leaked write, on git metadata changes, and on any write through a
+  link, naming the files.
+- **Verified:** 11 isolation tests pass through the library and the real CLI (53 in the whole
+  suite); an end-to-end scene running `git reset --hard && git clean -fdx` left the source
+  byte-identical, and a scene writing into the linked `node_modules` failed the shoot.
+- **Limit:** a link is detected, not prevented: a write through it lands in the source and fails
+  the shoot. Links are for dependencies a scene only reads.
 
 Build:
 

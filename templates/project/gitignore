@@ -4,6 +4,8 @@ clips/
 out/
 cache/
 chrome-profile/
+.ghostcast/
+logs/
 
 # VS Code server state, and its access token.
 vscode/server-data/

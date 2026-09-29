@@ -1,0 +1,17 @@
+{
+  "world": {
+    "source": "../my-product",
+    "mode": "snapshot",
+    "copy": [".env"],
+    "link": ["node_modules"],
+    "setup": ["npm run seed"],
+    "services": [
+      {
+        "name": "web",
+        "cmd": "npm run dev",
+        "port": true,
+        "ready": { "url": "http://127.0.0.1:${PORT}/", "timeout": 30000 }
+      }
+    ]
+  }
+}

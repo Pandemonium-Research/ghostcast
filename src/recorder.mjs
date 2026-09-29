@@ -18,6 +18,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import pty from '@lydell/node-pty';
 import { gitBash } from './shell.mjs';
+import { assertOutsideSource } from './world.mjs';
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 const DRIVER = fs.readFileSync(path.join(SRC, 'driver.js'), 'utf8');
@@ -35,9 +36,9 @@ export function loadProject(dir) {
   return { root, config: JSON.parse(fs.readFileSync(file, 'utf8')) };
 }
 
-export async function launch(project, { headed = false } = {}) {
+export async function launch(project, { headed = false, world = null } = {}) {
   const { width, height, dpr } = project.config.viewport;
-  const ctx = await chromium.launchPersistentContext(path.join(project.root, 'chrome-profile'), {
+  const ctx = await chromium.launchPersistentContext(world ? world.profile : path.join(project.root, '.ghostcast', 'chrome-profile'), {
     channel: project.config.browser?.channel ?? 'chrome',
     headless: !headed,
     viewport: { width, height },
@@ -92,7 +93,7 @@ export async function startCapture(project, page, dir, { quality = 92, everyNthF
 
 // Everything a scene gets. Keystrokes go through Playwright, so they are trusted events — xterm.js
 // (VS Code's terminal) ignores synthetic ones.
-export function makeHelpers(project, page, log) {
+export function makeHelpers(project, page, log, world = null) {
   const ev = (fn, arg) => page.evaluate(fn, arg);
   // A Playwright locator can't be passed into the page, so it becomes its on-screen rectangle here,
   // padded the way the page pads an element. Other targets go to the page as they are.
@@ -104,6 +105,11 @@ export function makeHelpers(project, page, log) {
   };
   const rectOf = async (target, pad = 6) => ev(([t, p]) => window.__rec.rectOf(t, p), [await resolve(target, pad), pad]);
   const guarded = new Map();
+  const sceneFolder = (folder) => {
+    const target = path.resolve(world?.dir || project.root, folder || '.');
+    assertOutsideSource(target, world?.source);
+    return target;
+  };
   let terminalPty = null;
   let terminalData = null;
   let terminalOutput = Promise.resolve();
@@ -119,7 +125,7 @@ export function makeHelpers(project, page, log) {
   };
 
   const h = {
-    page, project, config: project.config, sleep,
+    page, project, config: project.config, world, sleep,
     log(label, data) { log.push(data === undefined ? [Date.now(), label] : [Date.now(), label, data]); },
 
     // cut.py keeps a little footage either side of a segment; the pauses keep off-camera work (a
@@ -242,13 +248,13 @@ export function makeHelpers(project, page, log) {
     // Paths are relative to the project. Snapshot files now; they are restored when the take ends,
     // however it ends.
     guardFiles(...files) {
-      for (const f of files.flat().map((x) => path.resolve(project.root, x))) if (!guarded.has(f)) guarded.set(f, fs.readFileSync(f));
+      for (const f of files.flat().map(sceneFolder)) if (!guarded.has(f)) guarded.set(f, fs.readFileSync(f));
     },
     restoreFiles() { for (const [f, b] of guarded) fs.writeFileSync(f, b); },
     closeTerminal,
     // Replace exact strings in a file, keeping its line endings.
     editFile(rel, pairs) {
-      const file = path.resolve(project.root, rel);
+      const file = sceneFolder(rel);
       let b = fs.readFileSync(file, 'utf8');
       const crlf = b.includes('\r\n');
       for (const [from, to] of pairs) {
@@ -264,7 +270,7 @@ export function makeHelpers(project, page, log) {
   h.terminal = {
     async open(folder, { fontSize = 24, padding = 30 } = {}) {
       closeTerminal();
-      const cwd = path.resolve(project.root, folder);
+      const cwd = sceneFolder(folder);
       if (!fs.statSync(cwd).isDirectory()) throw new Error(`terminal.open: not a folder: ${cwd}`);
       const rc = path.join(project.root, 'vscode', 'shell.bashrc');
       if (!fs.existsSync(rc)) throw new Error(`terminal.open: missing ${rc}`);
@@ -350,7 +356,9 @@ function vscodeHelpers(h) {
       if (!fs.existsSync(tokenFile)) throw new Error(`no ${tokenFile}: start VS Code first (ghostcast vscode)`);
       const token = fs.readFileSync(tokenFile, 'utf8').trim();
       // serve-web takes a Windows folder as /c:/Users/…
-      const abs = path.resolve(h.project.root, folder).replace(/\\/g, '/');
+      const folderPath = path.resolve(h.world?.dir || h.project.root, folder || '.');
+      assertOutsideSource(folderPath, h.world?.source);
+      const abs = folderPath.replace(/\\/g, '/');
       const param = /^[A-Za-z]:\//.test(abs) ? '/' + abs[0].toLowerCase() + abs.slice(1) : abs;
       const url = `${cfg.url || 'http://127.0.0.1:8765'}/?tkn=${token}&folder=${encodeURIComponent(param)}`;
       // The workbench, or its first terminal, occasionally fails to come up: when takes run back to
@@ -463,12 +471,13 @@ function vscodeHelpers(h) {
 }
 
 // Record one take: run the scene's setup, then capture its default export.
-export async function record(project, sceneFile, take, { headed = false } = {}) {
+export async function record(project, sceneFile, take, { headed = false, world = null } = {}) {
+  if (world) world.reset();
   const scene = await import(pathToFileURL(path.resolve(project.root, sceneFile)).href);
   const dir = path.join(project.root, 'raw', take);
   const log = [];
-  const { ctx, page } = await launch(project, { headed });
-  const h = makeHelpers(project, page, log);
+  const { ctx, page } = await launch(project, { headed, world });
+  const h = makeHelpers(project, page, log, world);
   let ok = false;
   // When a take fails, the page as it stood is the fastest way to see why.
   const snap = async (name) => {

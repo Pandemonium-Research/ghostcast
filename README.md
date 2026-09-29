@@ -20,6 +20,12 @@ finished video:
 Post-production is deterministic: a retake is one command, and the edit is data
 (`timeline.json`, `voiceover/plan.json`), not a timeline in a video editor.
 
+For a product checkout, add `world` to `project.json` with `source` pointing to it. Each shoot
+uses a disposable copy under the ghostcast cache. Snapshot mode includes current uncommitted
+edits and untracked files; commit mode checks out a chosen `ref`. The source is fingerprinted
+before and after recording. See [the world example](templates/project/world.example.json) and
+[scene API](docs/scene-api.md).
+
 Recording real tools without a screen has sharp edges: frames that stop arriving, keystrokes
 that vanish, terminals that ignore synthetic input. ghostcast handles them, and
 [`docs/gotchas.md`](docs/gotchas.md) explains each one.
@@ -98,9 +104,9 @@ nothing faked, no personal data, ask before costly or outward-facing steps). The
 | `ghostcast init <dir>` | New project from the template |
 | `ghostcast doctor` | Check the toolchain |
 | `ghostcast vscode [--port]` | Serve VS Code for editor scenes, with its settings and clean shell |
-| `ghostcast record <take> [--headed]` | Run a scene and capture it |
+| `ghostcast record <take> [--headed] [--keep-world]` | Run a scene and capture it in one isolated world |
 | `ghostcast cut <take…>` | Frames → cached beats and captioned clip: segments, speed, zoom |
-| `ghostcast all [take…]` | Record + cut (one retry per take), then assemble |
+| `ghostcast all [take…] [--keep-world]` | Share one world across takes, reset each take, then assemble |
 | `ghostcast assemble` | Cached beats → silent cut by stream copy + cue sheet |
 | `ghostcast review <take\|final> [--raw] [--at s]` | Contact sheets and stills |
 | `ghostcast vo-script` | Narration timed against the cut, with fit warnings |
@@ -112,7 +118,7 @@ nothing faked, no personal data, ask before costly or outward-facing steps). The
 ```js
 // scenes/build.mjs
 export async function setup(h) {
-  await h.terminal.open('/path/to/project');
+  await h.terminal.open(h.world?.dir || 'workspace');
 }
 
 export default async function (h) {
@@ -138,7 +144,6 @@ ghostcast is growing into two things (details in [VISION.md](VISION.md)):
 Planned for version 1 ([PLAN.md](PLAN.md)):
 
 - one-command install (`npx ghostcast`);
-- every shoot in an isolated copy of your project, so your checkout is never touched;
 - quick shoots with no configuration;
 - storyboards instead of scripts, with automatic camera, holds and checks;
 - voice from any source, placed by beat;

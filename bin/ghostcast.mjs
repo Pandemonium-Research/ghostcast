@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gitBash } from '../src/shell.mjs';
+import { cacheDir, worldsDir, prepareWorld, openWorld } from '../src/world.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = path.resolve(HERE, '..');
@@ -23,9 +24,11 @@ const HELP = `ghostcast — a recording studio for coding agents
                                         (runs until stopped; start it in the background, and
                                         record once it prints "VS Code is ready")
 
-  ghostcast record <take> [--headed]    run the take's scene and capture it to raw/<take>/
+  ghostcast record <take> [--headed] [--keep-world]
+                                        run the take in an isolated world
   ghostcast cut <take> [...]            raw/<take>/ → clips/<take>.mp4 (segments, speed, zoom)
-  ghostcast all [<take> ...]            record + cut each take (one retry), then assemble
+  ghostcast all [<take> ...] [--keep-world]
+                                        record + cut each take (one retry), then assemble
   ghostcast assemble                    clips + captions → out/<name>-silent.mp4 + cue sheet
   ghostcast review <take|final> [--raw] [--at <s>] [--every <s>]
                                         contact sheets and stills under out/review/
@@ -52,20 +55,22 @@ function timeline() {
 function sceneFor(take) {
   const item = timeline().items.find((i) => i.take === take);
   const rel = item?.scene || `scenes/${take}.mjs`;
-  if (!fs.existsSync(path.join(projectDir, rel))) die(`${take}: no scene (${rel}); add it, or set "scene" on the take in timeline.json`);
+  if (!fs.existsSync(path.join(projectDir, rel))) throw new Error(`${take}: no scene (${rel}); add it, or set "scene" on the take in timeline.json`);
   return rel;
 }
 
-async function record(take, headed) {
+async function record(take, headed, world) {
   const { loadProject, record: rec } = await import('../src/recorder.mjs');
-  return rec(loadProject(projectDir), sceneFor(take), take, { headed });
+  return rec(loadProject(projectDir), sceneFor(take), take, { headed, world });
 }
 
 // Each take records in a child process: a scene that hangs or crashes Chrome takes only itself down.
-function recordChild(take, headed) {
+function recordChild(take, headed, world) {
   return new Promise((resolve) => {
-    const args = [fileURLToPath(import.meta.url), 'record', take, '--project', projectDir, ...(headed ? ['--headed'] : [])];
+    const args = [fileURLToPath(import.meta.url), 'record', take, '--project', projectDir,
+      ...(headed ? ['--headed'] : []), ...(world ? ['--world-dir', world.dir] : [])];
     const p = spawn(process.execPath, args, { stdio: 'inherit' });
+    p.on('error', (e) => { console.error(e); resolve(false); });
     p.on('exit', (code) => resolve(code === 0));
   });
 }
@@ -86,13 +91,6 @@ function which(bin) {
 
 // Files ghostcast keeps once per machine rather than per project: GHOSTCAST_CACHE, or the platform's
 // cache folder.
-function cacheDir() {
-  if (process.env.GHOSTCAST_CACHE) return path.resolve(process.env.GHOSTCAST_CACHE);
-  if (process.platform === 'win32') return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'ghostcast');
-  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Caches', 'ghostcast');
-  return path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'ghostcast');
-}
-
 // The VS Code server that `code serve-web` downloads (about 600 MB a build) lives in the cache, shared
 // by every project: the download takes minutes, and from inside a deep project folder its files pass
 // Windows' 260-character path limit (the terminal then fails with "Cannot find conpty.dll").
@@ -191,9 +189,11 @@ const commands = {
     console.log(`info  VS Code server cache: ${cli}\n      ${builds.length
       ? `${builds.length} build(s) downloaded`
       : 'empty: the first `ghostcast vscode` downloads a build (about 600 MB), which can take a few minutes'}`);
+    console.log(`info  isolated worlds: ${worldsDir()}`);
     if (process.platform === 'win32') {
       check('VS Code server cache path short enough for Windows', cli.length + SERVER_DEPTH <= 259,
         `the server's files would pass Windows' 260-character path limit; set GHOSTCAST_CACHE to a folder at most ${259 - SERVER_DEPTH - '\\vscode-cli'.length} characters long`);
+      if (worldsDir().length + 13 + 120 > 259) console.warn('warn  World path may be too long for nested files on Windows; set GHOSTCAST_CACHE to a shorter folder');
     }
     process.exit(bad ? 1 : 0);
   },
@@ -225,9 +225,16 @@ const commands = {
 
   async record() {
     const headed = flag('--headed');
+    const keep = flag('--keep-world');
+    const existing = opt('--world-dir', null);
     const take = argv[0] || die('usage: ghostcast record <take> [--headed]');
-    const ok = await record(take, headed).catch((e) => { console.error(e.stack || e.message); return false; });
-    process.exit(ok ? 0 : 1);
+    let world = null, ok = false, untouched = true;
+    try {
+      world = existing ? openWorld(existing) : await prepareWorld((await import('../src/recorder.mjs')).loadProject(projectDir), { keep });
+      ok = await record(take, headed, world);
+    } catch (e) { console.error(e.stack || e.message); }
+    finally { if (world?.dispose) untouched = await world.dispose(); }
+    process.exit(ok && untouched ? 0 : 1);
   },
 
   async cut() { if (!argv.length) die('usage: ghostcast cut <take> [...]'); const { cut } = await import('../src/post/render.mjs'); for (const take of argv) await cut(projectDir, take); },
@@ -242,21 +249,27 @@ const commands = {
 
   async all() {
     const headed = flag('--headed');
+    const keep = flag('--keep-world');
     const takes = argv.length ? argv : timeline().items.map((i) => i.take);
     const failed = [];
-    for (const take of takes) {
-      console.log(`=== ${take}`);
-      let ok = false;
-      for (let attempt = 1; attempt <= 2 && !ok; attempt++) {
-        ok = await recordChild(take, headed);
-        if (!ok) console.log(`${take}: take failed (attempt ${attempt})`);
+    let world = null, untouched = true, code = 0;
+    try {
+      world = await prepareWorld((await import('../src/recorder.mjs')).loadProject(projectDir), { keep });
+      for (const take of takes) {
+        console.log(`=== ${take}`);
+        let ok = false;
+        for (let attempt = 1; attempt <= 2 && !ok; attempt++) {
+          ok = await recordChild(take, headed, world);
+          if (!ok) console.log(`${take}: take failed (attempt ${attempt})`);
+        }
+        // A failed take leaves partial footage in raw/; it is never cut as if it were a good one.
+        if (ok) { try { const { cut } = await import('../src/post/render.mjs'); await cut(projectDir, take); } catch (e) { console.error(e); failed.push(take); } } else { console.log(`${take}: NOT CUT (failed twice); see \`ghostcast review ${take} --raw\``); failed.push(take); }
       }
-      // A failed take leaves partial footage in raw/; it is never cut as if it were a good one.
-      if (ok) { try { const { cut } = await import('../src/post/render.mjs'); await cut(projectDir, take); } catch (e) { console.error(e); failed.push(take); } } else { console.log(`${take}: NOT CUT (failed twice); see \`ghostcast review ${take} --raw\``); failed.push(take); }
-    }
-    let code = 0; try { const { assemble } = await import('../src/post/render.mjs'); await assemble(projectDir); } catch (e) { console.error(e); code = 1; }
-    if (failed.length) die(`failed: ${failed.join(', ')}`);
-    process.exit(code);
+      try { const { assemble } = await import('../src/post/render.mjs'); await assemble(projectDir); } catch (e) { console.error(e); code = 1; }
+    } catch (e) { console.error(e.stack || e.message); code = 1; }
+    finally { if (world) untouched = await world.dispose(); }
+    if (failed.length) { console.error(`failed: ${failed.join(', ')}`); code = 1; }
+    process.exit(code || !untouched ? 1 : 0);
   },
 };
 
