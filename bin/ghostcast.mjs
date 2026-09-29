@@ -19,7 +19,10 @@ const HELP = `ghostcast — a recording studio for coding agents
 
   ghostcast shoot <command|url> [--in <dir>] [--out <file>] [--timeout <seconds>] [--keep]
                                         quick MP4 + README GIF, no project needed
-  ghostcast init <dir>                  new project from the template
+  ghostcast init                        add .ghostcast/ to this repository
+  ghostcast init <dir>                  create a sample project
+  ghostcast template <type> [--force]   write a launch, how-to, feature or receipt storyboard
+  ghostcast lint [--json]               check the studio plan and its timing
   ghostcast doctor                      check Chrome, ffmpeg and editor tools
   ghostcast vscode [--port 8765] --accept-server-license-terms
                                         serve VS Code in the browser for editor scenes
@@ -46,7 +49,10 @@ const flag = (name) => { const i = argv.indexOf(name); if (i < 0) return false; 
 const opt = (name, dflt) => { const i = argv.indexOf(name); if (i < 0) return dflt; const v = argv[i + 1]; argv.splice(i, 2); return v; };
 const die = (msg) => { console.error(msg); process.exit(1); };
 
-const projectDir = path.resolve(opt('--project', process.cwd()));
+const explicitProject = opt('--project', null);
+const current = process.cwd();
+const projectDir = path.resolve(explicitProject || (fs.existsSync(path.join(current, '.ghostcast', 'product.md'))
+  && !fs.existsSync(path.join(current, 'project.json')) ? path.join(current, '.ghostcast') : current));
 const cmd = argv.shift();
 
 function timeline() {
@@ -84,6 +90,15 @@ function copyDir(src, dst) {
     if (e.isDirectory()) copyDir(s, d);
     else if (!fs.existsSync(d)) fs.copyFileSync(s, d);
   }
+}
+
+function studioDir() {
+  return path.basename(projectDir) === '.ghostcast' ? projectDir : path.join(projectDir, '.ghostcast');
+}
+
+function slug(name) {
+  const clean = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'video';
+  return /^[a-z]/.test(clean) ? clean : `video-${clean}`;
 }
 
 function which(bin) {
@@ -157,12 +172,52 @@ const commands = {
   async shoot() { const { shoot } = await import('../src/shoot.mjs'); try { await shoot(argv); } catch (e) { die(e.message); } },
 
   init() {
-    const dir = argv[0] ? path.resolve(argv[0]) : die('usage: ghostcast init <dir>');
-    copyDir(path.join(PKG, 'templates', 'project'), dir);
-    const pj = path.join(dir, 'project.json');
-    const cfg = JSON.parse(fs.readFileSync(pj, 'utf8'));
-    if (cfg.name === 'screencast') { cfg.name = path.basename(dir).toLowerCase().replace(/[^a-z0-9-]+/g, '-'); fs.writeFileSync(pj, JSON.stringify(cfg, null, 2) + '\n'); }
-    console.log(`project at ${dir}\nnext: edit timeline.json and scenes/, then \`ghostcast record <take>\` from there (or pass --project).`);
+    if (argv[0]) {
+      const dir = path.resolve(argv[0]);
+      copyDir(path.join(PKG, 'templates', 'project'), dir);
+      const pj = path.join(dir, 'project.json');
+      const cfg = JSON.parse(fs.readFileSync(pj, 'utf8'));
+      if (cfg.name === 'screencast') { cfg.name = path.basename(dir).toLowerCase().replace(/[^a-z0-9-]+/g, '-'); fs.writeFileSync(pj, JSON.stringify(cfg, null, 2) + '\n'); }
+      console.log(`project at ${dir}\nnext: edit timeline.json and scenes/, then \`ghostcast record <take>\` from there (or pass --project).`);
+      return;
+    }
+    const dir = studioDir();
+    fs.mkdirSync(dir, { recursive: true });
+    for (const entry of fs.readdirSync(path.join(PKG, 'templates', 'studio'), { withFileTypes: true })) {
+      const target = path.join(dir, entry.name === 'gitignore' ? '.gitignore' : entry.name);
+      if (fs.existsSync(target)) { console.log(`kept ${path.relative(process.cwd(), target)}`); continue; }
+      if (entry.isDirectory()) fs.mkdirSync(target);
+      else fs.copyFileSync(path.join(PKG, 'templates', 'studio', entry.name), target);
+      console.log(`created ${path.relative(process.cwd(), target)}`);
+    }
+    const git = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: path.dirname(dir), encoding: 'utf8' });
+    if (git.status !== 0 || git.stdout.trim() !== 'true') console.warn('warning: this directory is not a git repository');
+  },
+
+  async template() {
+    const force = flag('--force');
+    const type = argv[0];
+    if (!['launch', 'how-to', 'feature', 'receipt'].includes(type)) die('usage: ghostcast template <launch|how-to|feature|receipt> [--force]');
+    const dir = studioDir();
+    const target = path.join(dir, 'storyboard.yaml');
+    if (!fs.existsSync(path.join(dir, 'brief.md'))) die(`no brief.md in ${dir}; run ghostcast init first`);
+    if (fs.existsSync(target) && !force) die(`${target} exists; pass --force to replace it`);
+    const { readBrief } = await import('../src/studio/schema.mjs');
+    const { data, problems } = readBrief(fs.readFileSync(path.join(dir, 'brief.md'), 'utf8'));
+    if (problems.length) die(`brief.md needs valid YAML front matter before a template can be written: ${problems[0].message}`);
+    if (!Number.isFinite(data?.cap) || data.cap < 10 || data.cap > 600) die('brief.md: set cap to a number from 10 to 600 seconds');
+    const cap = data.cap;
+    const source = fs.readFileSync(path.join(PKG, 'templates', 'storyboards', `${type}.yaml`), 'utf8');
+    fs.writeFileSync(target, source.replace('__VIDEO__', slug(path.basename(path.dirname(dir)))).replace('__CAP__', String(cap)));
+    console.log(`wrote ${target}`);
+  },
+
+  async lint() {
+    const json = flag('--json');
+    const { lint, formatLint } = await import('../src/studio/lint.mjs');
+    const report = lint(studioDir());
+    console.log(json ? JSON.stringify(report, null, 2) : formatLint(report));
+    if (report.errors.length) process.exitCode = 1;
   },
 
   async doctor() {

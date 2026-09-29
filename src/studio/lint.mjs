@@ -1,0 +1,157 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { hasPlaceholder as containsPlaceholder, parseYaml, placeholder, readBrief, validateAudio, validateBrief, validateProduct, validateStoryboard, validateWorld } from './schema.mjs';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULTS = path.resolve(HERE, '../../templates/project/project.json');
+const files = {
+  'brief.md': validateBrief,
+  'product.md': validateProduct,
+  'storyboard.yaml': validateStoryboard,
+  'world.yaml': validateWorld,
+  'audio.yaml': validateAudio,
+};
+
+function words(value) {
+  return typeof value === 'string' ? (value.match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu) || []).length : 0;
+}
+
+function sentences(value) {
+  if (typeof value !== 'string') return 0;
+  const protectedText = value.replace(/\b(?:e\.g\.|i\.e\.)/gi, (part) => part.replaceAll('.', '∎'));
+  return protectedText.split(/[.!?](?:\s+|$)/).filter((part) => part.trim()).length;
+}
+
+function actionSeconds(beat) {
+  let total = beat.open ? 1.5 : 0;
+  for (const action of Array.isArray(beat.do) ? beat.do : []) {
+    if (!action || typeof action !== 'object' || Array.isArray(action)) continue;
+    const [verb, value] = Object.entries(action)[0] || [];
+    if (verb === 'click') total += 1;
+    if (verb === 'fill' && value && typeof value === 'object') total += Object.values(value).reduce((sum, field) => sum + 0.6 + String(field).length / 17, 0);
+    if (verb === 'press') total += 0.4;
+    if (verb === 'run') total += 0.5 + String(typeof value === 'string' ? value : value?.cmd || '').length / 17 + (typeof value === 'object' && Number.isFinite(value?.expect) ? value.expect : 2);
+    if (verb === 'wait') total += typeof value === 'number' ? value : 1;
+    if (verb === 'code') total += 2;
+  }
+  return total;
+}
+
+function estimateBeat(beat, wps) {
+  const narration = words(beat.say) / wps;
+  const actions = actionSeconds(beat);
+  const seconds = beat.script ? (Number.isFinite(beat.seconds) ? beat.seconds : 10)
+    : beat.surface === 'panel' ? Math.max(narration + 0.5, 3)
+      : Math.max(narration + 0.5, actions + 1.5, 2);
+  return { id: beat.id || '?', seconds, narration, actions };
+}
+
+// Only what the agent writes is scanned: text files at the top of the folder, and under panels/ and
+// scenes/. The rest of the folder is footage, renders and a browser profile.
+const TEXT = /\.(?:md|ya?ml|json|m?js|html|css|txt)$/i;
+const KNOWN_TOKEN = /(?:sk-[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9_]{12,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|xox[a-z0-9]*-[A-Za-z0-9-]{10,})/g;
+// A long run of hex or base64 is a secret only when it mixes digits and letters (and, for base64,
+// both cases): paths and words make long runs too.
+const LONG_RUN = /(?<![A-Za-z0-9_+/=-])(?:[a-fA-F0-9]{32,}|[A-Za-z0-9+/]{40,}={0,2})(?![A-Za-z0-9_+/=-])/g;
+const random = (run) => /\d/.test(run) && /[a-z]/i.test(run) && (/^[a-f0-9]+$/i.test(run) || (/[a-z]/.test(run) && /[A-Z]/.test(run) && (run.match(/\//g) || []).length < 3));
+
+function secretProblems(dir) {
+  const problems = [];
+  const files = [];
+  const walk = (folder, deep) => {
+    if (!fs.existsSync(folder)) return;
+    for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
+      const full = path.join(folder, entry.name);
+      if (entry.isDirectory()) { if (deep) walk(full, deep); }
+      else if (entry.isFile() && TEXT.test(entry.name)) files.push(full);
+    }
+  };
+  walk(dir, false);
+  walk(path.join(dir, 'panels'), true);
+  walk(path.join(dir, 'scenes'), true);
+  for (const full of files) {
+    const content = fs.readFileSync(full, 'utf8');
+    const found = [...content.matchAll(KNOWN_TOKEN), ...[...content.matchAll(LONG_RUN)].filter((m) => random(m[0]))];
+    for (const match of found) problems.push({ file: path.relative(dir, full).replace(/\\/g, '/'), path: '',
+      line: content.slice(0, match.index).split('\n').length, message: 'possible literal key or token; remove it and use an environment variable' });
+  }
+  return problems;
+}
+
+export function lint(dir) {
+  const root = path.resolve(dir);
+  const errors = [], warnings = [];
+  const push = (level, rule, problem) => (level === 'error' ? errors : warnings).push({ level, rule, ...problem });
+  const sources = {};
+  for (const [file, validator] of Object.entries(files)) {
+    const full = path.join(root, file);
+    if (!fs.existsSync(full)) { push('error', 'schema', { file, path: '', message: `create ${file}` }); continue; }
+    sources[file] = fs.readFileSync(full, 'utf8');
+    if (file !== 'storyboard.yaml') for (const problem of validator(sources[file])) push('error', 'schema', problem);
+  }
+  const brief = sources['brief.md'] ? readBrief(sources['brief.md']).data || {} : {};
+  if (sources['storyboard.yaml']) for (const problem of validateStoryboard(sources['storyboard.yaml'], brief)) push('error', 'schema', problem);
+  const parsed = sources['storyboard.yaml'] ? parseYaml(sources['storyboard.yaml'], 'storyboard.yaml') : null;
+  const storyboard = parsed?.data && typeof parsed.data === 'object' && !Array.isArray(parsed.data) ? parsed.data : {};
+  let wps = JSON.parse(fs.readFileSync(DEFAULTS, 'utf8')).voiceover.wordsPerSecond;
+  const configFile = path.join(root, 'project.json');
+  if (fs.existsSync(configFile)) {
+    try { wps = JSON.parse(fs.readFileSync(configFile, 'utf8')).voiceover?.wordsPerSecond || wps; }
+    catch (error) { push('error', 'schema', { file: 'project.json', path: '', message: `invalid JSON: ${error.message}` }); }
+  }
+  if (!(wps > 0)) wps = 2.5;
+  const beats = Array.isArray(storyboard.beats) ? storyboard.beats : [];
+  const estimates = [];
+  let placeholderBeats = 0;
+  beats.forEach((beat, i) => {
+    if (!beat || typeof beat !== 'object' || Array.isArray(beat)) return;
+    const base = `beats[${i}]`, name = beat.id || '?';
+    const at = (key, rule, level, message) => push(level, rule, { file: 'storyboard.yaml', path: key ? `${base}.${key}` : base, line: parsed.line(['beats', i, ...(key ? [key] : [])]), id: name, message });
+    estimates.push(estimateBeat(beat, wps));
+    const hasPlaceholder = containsPlaceholder(beat);
+    if (hasPlaceholder) placeholderBeats++;
+    if (!placeholder(beat.claim) && sentences(beat.claim) > 1) at('claim', 'one-claim', 'error', 'keep the claim to one sentence');
+    const saySentences = sentences(beat.say);
+    if (!placeholder(beat.say) && saySentences > 2) at('say', 'one-claim', 'error', 'keep narration to at most two sentences');
+    if (!placeholder(beat.say) && saySentences === 2 && !beat.claim) at('say', 'one-claim', 'warning', 'two narration sentences need a single claim');
+    const budgetSeconds = Number.isFinite(beat.seconds) ? beat.seconds : 12;
+    const count = words(beat.say), budget = Math.floor(budgetSeconds * wps);
+    if (!placeholder(beat.say) && count > budget) at('say', 'word-budget', 'error', `${count} words; the budget is ${budget} (${budgetSeconds} s at ${wps} words/s). Cut the line or set seconds`);
+    const estimate = estimates.at(-1);
+    if (!beat.script && !placeholder(beat.say) && !containsPlaceholder(beat.do ?? beat.open) && estimate.actions > estimate.narration + 6) at('do', 'pacing', 'warning', 'actions outrun the narration by more than 6 s; shorten the picture or add narration');
+    if (['standard', 'production'].includes(storyboard.weight ?? brief.weight) && !beat.say) at('say', 'silent', 'warning', 'add narration or use quick weight');
+    const actions = Array.isArray(beat.do) ? beat.do : [];
+    const last = actions.at(-1);
+    if (!beat.show && last && ['click', 'press', 'fill', 'code'].includes(Object.keys(last)[0])) at('do', 'wait-after-action', 'warning', 'add show or a final wait after the action');
+    if (typeof beat.show === 'string') {
+      const kind = beat.show.split(/\s+/, 1)[0];
+      if ((kind === 'row' && beat.surface !== 'terminal') || (kind === 'line' && beat.surface !== 'editor')
+        || (['text', 'role', 'label', 'css'].includes(kind) && beat.surface === 'terminal')) at('show', 'show-surface', 'error', `${kind} targets do not work on ${beat.surface}; use ${{ terminal: 'row "…"', editor: 'line "…"' }[beat.surface] || 'text "…", role <role> "…", label "…" or css <selector>'}`);
+    }
+  });
+  const total = estimates.reduce((sum, beat) => sum + beat.seconds, 0);
+  const cap = storyboard.cap ?? brief.cap ?? null;
+  const panelShare = brief.panel_share ?? 0.2;
+  if (placeholderBeats !== beats.length && total > 0) {
+    const panelSeconds = estimates.reduce((sum, beat, i) => sum + (beats[i]?.surface === 'panel' ? beat.seconds : 0), 0);
+    if (panelSeconds / total > panelShare) push('error', 'panel-share', { file: 'storyboard.yaml', path: 'beats', message: `panels take ${panelSeconds.toFixed(1)} s of ${total.toFixed(1)} s (${(panelSeconds / total * 100).toFixed(1)}%); keep them within ${(panelShare * 100).toFixed(0)}% of the video, or set panel_share in brief.md` });
+    if (Number.isFinite(cap) && total > cap) push('error', 'cap', { file: 'storyboard.yaml', path: 'cap', line: parsed?.line(['cap']), message: `${total.toFixed(1)} s estimated; shorten beats to fit the ${cap} s cap` });
+  }
+  for (const problem of secretProblems(root)) push('error', 'secrets', problem);
+  return { errors, warnings, estimate: { total, cap, beats: estimates } };
+}
+
+export function formatLint(report) {
+  const lines = [];
+  for (const problem of [...report.errors, ...report.warnings]) {
+    const location = `${problem.file}${problem.line ? `:${problem.line}` : ''}${problem.path ? ` ${problem.path}` : ''}${problem.id ? ` (${problem.id})` : ''}`;
+    lines.push(`${problem.level.padEnd(7)}${problem.rule.padEnd(19)}${location}: ${problem.message}`);
+  }
+  lines.push('');
+  lines.push('beat                 estimate  narration  actions');
+  for (const beat of report.estimate.beats) lines.push(`${String(beat.id).padEnd(20)} ${beat.seconds.toFixed(1).padStart(6)} s  ${beat.narration.toFixed(1).padStart(6)} s  ${beat.actions.toFixed(1).padStart(6)} s`);
+  lines.push(`total: ${report.estimate.total.toFixed(1)} s / cap: ${report.estimate.cap ?? '?'} s`);
+  lines.push(`${report.errors.length} error(s), ${report.warnings.length} warning(s)`);
+  return lines.join('\n');
+}

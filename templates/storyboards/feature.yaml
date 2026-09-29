@@ -1,0 +1,33 @@
+# Frame: show the old context, use the feature, reveal its payoff, then show where to find it.
+# Aim for 45 to 90 seconds; cap is copied from brief.md.
+video: __VIDEO__
+weight: standard
+type: feature
+cap: __CAP__
+beats:
+  - id: context
+    surface: web
+    open: "<Starting page>"
+    show: 'text "<Old context>"'
+    claim: "<What used to be hard>"
+    say: "<Explain the old context>"
+
+  - id: feature-in-use
+    surface: web
+    do:
+      - click: "<Feature control>"
+    show: 'text "<Feature result>"'
+    claim: "<What the feature does>"
+    say: "<Show the feature in use>"
+
+  - id: payoff
+    surface: web
+    show: 'text "<Payoff>"'
+    claim: "<Why the change matters>"
+    say: "<Name the payoff>"
+
+  - id: where-to-find-it
+    surface: web
+    show: 'label "<Navigation label>"'
+    claim: "<Where the feature lives>"
+    say: "<Tell the viewer where to find it>"

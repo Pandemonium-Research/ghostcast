@@ -1,0 +1,28 @@
+# Frame: make one claim, show direct evidence, then give one line of context for a PR or changelog.
+# Aim for 20 to 45 seconds; cap is copied from brief.md.
+video: __VIDEO__
+weight: quick
+type: receipt
+cap: __CAP__
+beats:
+  - id: claim
+    surface: terminal
+    do:
+      - run: "<Command that frames the claim>"
+    show: 'row "<Claim context>"'
+    claim: "<One verifiable claim>"
+    say: "<State the claim>"
+
+  - id: evidence
+    surface: terminal
+    do:
+      - run: "<Command that proves it>"
+    show: 'row "<Evidence>"'
+    claim: "<What the output proves>"
+    say: "<Point to the evidence>"
+
+  - id: context
+    surface: terminal
+    show: 'row "<Where this matters>"'
+    claim: "<One line of context>"
+    say: "<Give one line of context>"

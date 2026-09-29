@@ -1,0 +1,57 @@
+# Frame: name the problem, reveal the product, prove two or three capabilities, then invite action.
+# Aim for 60 to 90 seconds; cap is copied from brief.md.
+video: __VIDEO__
+weight: production
+type: launch
+cap: __CAP__
+beats:
+  - id: hook
+    surface: panel
+    panel: { use: title, title: "<The problem>" }
+    claim: "<The problem the viewer recognises>"
+    say: "<Name the problem>"
+
+  - id: reveal
+    surface: web
+    open: "<Product URL>"
+    show: 'text "<The key result>"'
+    claim: "<What the product makes possible>"
+    say: "<Reveal the product doing its key thing>"
+
+  - id: capability-one
+    surface: web
+    do:
+      - click: "<First capability control>"
+    show: 'text "<First visible result>"'
+    claim: "<First capability>"
+    say: "<Explain the first capability>"
+
+  - id: capability-two
+    surface: web
+    do:
+      - click: "<Second capability control>"
+    show: 'text "<Second visible result>"'
+    claim: "<Second capability>"
+    say: "<Explain the second capability>"
+
+  - id: capability-three
+    surface: web
+    do:
+      - click: "<Third capability control>"
+    show: 'text "<Third visible result>"'
+    claim: "<Third capability>"
+    say: "<Explain the third capability>"
+
+  - id: proof
+    surface: terminal
+    do:
+      - run: "<Command that proves the result>"
+    show: 'row "<Evidence>"'
+    claim: "<What the evidence proves>"
+    say: "<Connect the evidence to the promise>"
+
+  - id: call-to-action
+    surface: panel
+    panel: { use: cta, title: "<What to do next>" }
+    claim: "<One clear next step>"
+    say: "<Invite the viewer to act>"

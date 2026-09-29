@@ -1,0 +1,10 @@
+provider: kokoro
+voice: af_heart
+
+# ElevenLabs reads ELEVENLABS_API_KEY from the environment; never put a key here.
+# provider: elevenlabs
+# voice: <ElevenLabs voice ID>
+
+# For your own recordings:
+# provider: clips
+# dir: voiceover/

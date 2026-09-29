@@ -1,0 +1,17 @@
+source: ..
+mode: snapshot
+
+# The fields below mirror templates/project/world.example.json.
+# copy:
+#   - .env
+# link:
+#   - node_modules
+# setup:
+#   - npm run seed
+# services:
+#   - name: web
+#     cmd: npm run dev
+#     port: true
+#     ready:
+#       url: http://127.0.0.1:${PORT}/
+#       timeout: 30000

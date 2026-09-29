@@ -1,0 +1,49 @@
+# Frame: state the goal, prepare the viewer, show each step, verify the result, and point onward.
+# Aim for 90 to 180 seconds; cap is copied from brief.md.
+video: __VIDEO__
+weight: standard
+type: how-to
+cap: __CAP__
+beats:
+  - id: title
+    surface: panel
+    panel: { use: title, title: "<The goal>" }
+    claim: "<What the viewer will achieve>"
+    say: "<State the goal>"
+
+  - id: prerequisites
+    surface: terminal
+    do:
+      - run: "<Check prerequisite>"
+    show: 'row "<Ready message>"'
+    claim: "<What must be ready>"
+    say: "<Explain what the viewer needs>"
+
+  - id: step-one
+    surface: web
+    open: "<Starting page>"
+    do:
+      - click: "<First step>"
+    show: 'text "<First result>"'
+    claim: "<What this step accomplishes>"
+    say: "<Guide the first step>"
+
+  - id: step-two
+    surface: web
+    do:
+      - click: "<Second step>"
+    show: 'text "<Second result>"'
+    claim: "<What this step accomplishes>"
+    say: "<Guide the second step>"
+
+  - id: result
+    surface: web
+    show: 'text "<Final result>"'
+    claim: "<How to know it worked>"
+    say: "<Confirm the result>"
+
+  - id: what-next
+    surface: web
+    show: 'text "<Next option>"'
+    claim: "<The next useful action>"
+    say: "<Point to what comes next>"
