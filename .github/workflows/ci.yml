@@ -21,13 +21,16 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    env:
-      # Keep what a failed test leaves behind in one place for the upload below.
-      TMPDIR: ${{ runner.temp }}
-      TEMP: ${{ runner.temp }}
-      TMP: ${{ runner.temp }}
-      GHOSTCAST_CACHE: ${{ runner.temp }}/ghostcast-cache
     steps:
+      # Keep what a failed test leaves behind in one place for the upload below. The runner context
+      # only exists inside steps, so these are set here rather than in the job's env.
+      - name: temporary folders
+        shell: bash
+        run: |
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+          echo "TEMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
+          echo "TMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
+          echo "GHOSTCAST_CACHE=$RUNNER_TEMP/ghostcast-cache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
