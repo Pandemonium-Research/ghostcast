@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ffmpeg, ffmpegStderr } from './render.mjs';
+import { loadProject } from '../project.mjs';
 
 const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const say = (s) => process.stdout.write(`${s}\n`);
@@ -23,7 +24,7 @@ function fixed(value, digits) {
   return `${negative ? '-' : ''}${digits ? `${s.slice(0, -digits)}.${s.slice(-digits)}` : s}`;
 }
 const mmss = (t) => `${Math.floor(t / 60)}:${fixed(t % 60, 2).padStart(5, '0')}`;
-const cfg = (root) => readJson(path.join(root, 'project.json'));
+const cfg = (root) => loadProject(root).config;
 const timeline = (root) => readJson(path.join(root, 'timeline.json'));
 const meta = (root, take) => readJson(path.join(root, 'clips', `${take}.json`));
 

@@ -1,4 +1,5 @@
 import YAML, { LineCounter } from 'yaml';
+import { parseTarget } from './target.mjs';
 
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = (value) => typeof value === 'string' && value.trim().length > 0;
@@ -111,7 +112,7 @@ export function validateProduct(source) {
 
 const beatKeys = ['id', 'surface', 'claim', 'open', 'do', 'show', 'say', 'panel', 'camera', 'seconds', 'script'];
 const verbs = ['click', 'fill', 'press', 'run', 'wait', 'code'];
-const showPattern = /^(?:text\s+"[^"]+"|row\s+"[^"]+"|line\s+"[^"]+"|role\s+\S+\s+"[^"]+"|label\s+"[^"]+"|css\s+.+)$/;
+const target = (value) => { try { parseTarget(value); return true; } catch { return false; } };
 
 export function validateStoryboard(source, brief = {}) {
   brief ||= {};
@@ -135,7 +136,7 @@ export function validateStoryboard(source, brief = {}) {
     c.enumValue(beat.surface, ['web', 'terminal', 'editor', 'panel'], [...root, 'surface']);
     for (const key of ['claim', 'open', 'say', 'camera']) if (beat[key] !== undefined && !text(beat[key])) c.add([...root, key], 'use non-empty text');
     if (beat.seconds !== undefined && !seconds(beat.seconds)) c.add([...root, 'seconds'], 'set non-negative seconds');
-    if (beat.show !== undefined && (!text(beat.show) || !showPattern.test(beat.show))) c.add([...root, 'show'], 'use text "…", row "…", line "…", role <role> "…", label "…", or css <selector>');
+    if (beat.show !== undefined && !target(beat.show)) c.add([...root, 'show'], 'use text "…", row "…", line "…", role <role> "…", label "…", or css <selector>');
     if (beat.script !== undefined) {
       if (!text(beat.script) || !/^scenes\/[a-zA-Z0-9_./-]+$/.test(beat.script) || beat.script.split('/').includes('..')) c.add([...root, 'script'], 'use a path under scenes/');
       if (beat.open !== undefined || beat.do !== undefined) c.add([...root, 'script'], 'a script beat cannot also have open or do');
@@ -150,6 +151,7 @@ export function validateStoryboard(source, brief = {}) {
         if (verb === 'fill' && (!object(value) || !Object.keys(value).length || Object.entries(value).some(([label, field]) => !text(label) || !text(field)))) c.add(at, 'use a map of labels to text values');
         if (verb === 'run' && !(text(value) || (object(value) && Object.keys(value).every((key) => ['cmd', 'expect'].includes(key)) && text(value.cmd) && (value.expect === undefined || seconds(value.expect))))) c.add(at, 'use a command string or { cmd, expect } with non-negative seconds');
         if (verb === 'wait' && !(text(value) || seconds(value))) c.add(at, 'use seconds or a target');
+        else if (verb === 'wait' && typeof value === 'string' && !target(value)) c.add(at, 'use seconds or a target');
       });
     }
     if (beat.surface === 'panel') {

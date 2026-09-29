@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hasPlaceholder as containsPlaceholder, parseYaml, placeholder, readBrief, validateAudio, validateBrief, validateProduct, validateStoryboard, validateWorld } from './schema.mjs';
+import { parseTarget } from './target.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULTS = path.resolve(HERE, '../../templates/project/project.json');
@@ -13,7 +14,7 @@ const files = {
   'audio.yaml': validateAudio,
 };
 
-function words(value) {
+export function words(value) {
   return typeof value === 'string' ? (value.match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu) || []).length : 0;
 }
 
@@ -38,7 +39,7 @@ function actionSeconds(beat) {
   return total;
 }
 
-function estimateBeat(beat, wps) {
+export function estimateBeat(beat, wps) {
   const narration = words(beat.say) / wps;
   const actions = actionSeconds(beat);
   const seconds = beat.script ? (Number.isFinite(beat.seconds) ? beat.seconds : 10)
@@ -125,10 +126,15 @@ export function lint(dir) {
     const last = actions.at(-1);
     if (!beat.show && last && ['click', 'press', 'fill', 'code'].includes(Object.keys(last)[0])) at('do', 'wait-after-action', 'warning', 'add show or a final wait after the action');
     if (typeof beat.show === 'string') {
-      const kind = beat.show.split(/\s+/, 1)[0];
+      let kind;
+      try { kind = parseTarget(beat.show).kind; } catch { kind = null; }
       if ((kind === 'row' && beat.surface !== 'terminal') || (kind === 'line' && beat.surface !== 'editor')
         || (['text', 'role', 'label', 'css'].includes(kind) && beat.surface === 'terminal')) at('show', 'show-surface', 'error', `${kind} targets do not work on ${beat.surface}; use ${{ terminal: 'row "…"', editor: 'line "…"' }[beat.surface] || 'text "…", role <role> "…", label "…" or css <selector>'}`);
     }
+    // A web beat without open stays on whatever page is showing, which after another surface is
+    // that surface.
+    if (beat.surface === 'web' && !beat.open && !beat.script && beats[i - 1]?.surface !== 'web')
+      at('', 'surface-change', 'error', i ? `the beat before is ${beats[i - 1]?.surface}: add open: with the page to show` : 'the first web beat needs open: with the page to show');
   });
   const total = estimates.reduce((sum, beat) => sum + beat.seconds, 0);
   const cap = storyboard.cap ?? brief.cap ?? null;

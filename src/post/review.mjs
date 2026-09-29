@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { ffmpeg } from './render.mjs';
+import { loadProject } from '../project.mjs';
 
 const json = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const exists = (p) => fs.existsSync(p);
@@ -50,7 +51,7 @@ async function sheet(root, cfg, entries, title, dest) {
 export async function review(root, args) {
   const target = args[0];
   if (!target) throw new Error('usage: ghostcast review <take|final> [--raw] [--at seconds] [--every seconds]');
-  const cfg = json(path.join(root, 'project.json'));
+  const cfg = loadProject(root).config;
   const out = path.join(root, 'out', 'review'); fs.mkdirSync(out, { recursive: true });
   if (args.includes('--raw')) {
     const raw = path.join(root, 'raw', target), frames = json(path.join(raw, 'frames.json'));

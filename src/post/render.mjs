@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { beat_plan, windows, captionPieces } from './logic.mjs';
+import { loadProject } from '../project.mjs';
 
 const VERSION = 'perspective-beats-8';
 const ENCODER = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-tune', 'animation', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
@@ -208,7 +209,7 @@ async function join(paths, dest, root) {
 }
 
 export async function cut(root, take) {
-  const cfg = readJson(path.join(root, 'project.json'));
+  const cfg = loadProject(root).config;
   const raw = path.join(root, 'raw', take), frames = readJson(path.join(raw, 'frames.json')), log = readJson(path.join(raw, 'log.json'));
   if (!frames.length) throw new Error(`${take}: no frames`);
   const [w, h] = probeSize(path.join(raw, 'frames', frames[0][1]));
@@ -252,7 +253,7 @@ export async function cut(root, take) {
 }
 
 export async function assemble(root) {
-  const cfg = readJson(path.join(root, 'project.json')), timeline = readJson(path.join(root, 'timeline.json'));
+  const cfg = loadProject(root).config, timeline = readJson(path.join(root, 'timeline.json'));
   let t = 0; const paths = [], cues = [], missing = [];
   for (const item of timeline.items) {
     const clip = path.join(root, 'clips', `${item.take}.mp4`);

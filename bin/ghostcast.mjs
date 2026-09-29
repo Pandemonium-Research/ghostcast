@@ -23,6 +23,9 @@ const HELP = `ghostcast — a recording studio for coding agents
   ghostcast init <dir>                  create a sample project
   ghostcast template <type> [--force]   write a launch, how-to, feature or receipt storyboard
   ghostcast lint [--json]               check the studio plan and its timing
+  ghostcast compile                     generate cache/storyboard.mjs and timeline.json
+  ghostcast rehearse [beat ids...] [--runs 3] [--headed]
+                                        dry run beats without capture and report flakiness
   ghostcast doctor                      check Chrome, ffmpeg and editor tools
   ghostcast vscode [--port 8765] --accept-server-license-terms
                                         serve VS Code in the browser for editor scenes
@@ -94,6 +97,14 @@ function copyDir(src, dst) {
 
 function studioDir() {
   return path.basename(projectDir) === '.ghostcast' ? projectDir : path.join(projectDir, '.ghostcast');
+}
+
+// A studio folder's scene and timeline are generated, so a shoot compiles first: it films what the
+// storyboard says now, not what it said at the last compile.
+async function compileStudio() {
+  if (!fs.existsSync(path.join(projectDir, 'product.md')) || !fs.existsSync(path.join(projectDir, 'storyboard.yaml'))) return;
+  const { compile } = await import('../src/studio/compile.mjs');
+  try { compile(projectDir); } catch (e) { die(e.message); }
 }
 
 function slug(name) {
@@ -220,6 +231,21 @@ const commands = {
     if (report.errors.length) process.exitCode = 1;
   },
 
+  async compile() {
+    const { compile } = await import('../src/studio/compile.mjs');
+    try { compile(studioDir()); console.log(`compiled ${path.join(studioDir(), 'cache', 'storyboard.mjs')} and timeline.json`); }
+    catch (e) { die(e.message); }
+  },
+
+  async rehearse() {
+    const headed = flag('--headed');
+    const runs = Number(opt('--runs', '3'));
+    const { loadProject } = await import('../src/recorder.mjs');
+    const { rehearse } = await import('../src/studio/rehearse.mjs');
+    try { process.exitCode = await rehearse(loadProject(studioDir()), { ids: argv, runs, headed }); }
+    catch (e) { die(e.message); }
+  },
+
   async doctor() {
     let bad = 0;
     // An optional tool is reported but does not fail the check: quick shoots never need it.
@@ -288,6 +314,7 @@ const commands = {
     const keep = flag('--keep-world');
     const existing = opt('--world-dir', null);
     const take = argv[0] || die('usage: ghostcast record <take> [--headed]');
+    if (!existing) await compileStudio();
     let world = null, ok = false, untouched = true;
     try {
       world = existing ? openWorld(existing) : await prepareWorld((await import('../src/recorder.mjs')).loadProject(projectDir), { keep });
@@ -310,6 +337,7 @@ const commands = {
   async all() {
     const headed = flag('--headed');
     const keep = flag('--keep-world');
+    await compileStudio();
     const takes = argv.length ? argv : timeline().items.map((i) => i.take);
     const failed = [];
     let world = null, untouched = true, code = 0;
