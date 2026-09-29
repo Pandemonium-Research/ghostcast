@@ -31,8 +31,8 @@ jobs:
           echo "TEMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
           echo "TMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
           echo "GHOSTCAST_CACHE=$RUNNER_TEMP/ghostcast-cache" >> "$GITHUB_ENV"
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -52,9 +52,26 @@ jobs:
       - run: npm ci
       - run: node bin/ghostcast.mjs doctor
       - run: npm test
+      # The stage 3 promise, timed on each OS: from the packed package to a first clip.
+      - name: first clip from a clean install
+        shell: bash
+        run: |
+          start=$(date +%s)
+          npm pack --silent --pack-destination "$RUNNER_TEMP" > /dev/null
+          mkdir -p "$RUNNER_TEMP/clean/app"
+          cd "$RUNNER_TEMP/clean"
+          npm init -y > /dev/null
+          npm install --silent "$RUNNER_TEMP"/ghostcast-*.tgz
+          installed=$(date +%s)
+          cd app
+          git init -q && echo "# app" > README.md && git add . && git commit -qm init
+          ../node_modules/.bin/ghostcast shoot "ls -la"
+          done=$(date +%s)
+          test -s ls-la.mp4 && test -s ls-la.gif
+          echo "${{ runner.os }}: install $((installed - start)) s, shoot $((done - installed)) s, first clip $((done - start)) s" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: keep what failed tests left
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: failed-${{ matrix.os }}
           path: |
