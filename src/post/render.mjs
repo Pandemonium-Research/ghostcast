@@ -9,6 +9,10 @@ import { beat_plan, windows, captionPieces } from './logic.mjs';
 const VERSION = 'perspective-beats-8';
 const ENCODER = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-tune', 'animation', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
 const FFMPEG_BUILD = spawnSync('ffprobe', ['-version'], { encoding: 'utf8' }).stdout?.split(/\r?\n/)[0] ?? 'unknown';
+// A beat's filter graph can pass Windows' 32 767-character command line, so it goes in a file.
+// ffmpeg 7 reads any option from a file with "-/option"; newer builds dropped -filter_complex_script,
+// which 6.x (Ubuntu 24.04's) still needs. A git build without a version number counts as new.
+const FILTER_FILE = Number(/version n?(\d+)\./.exec(FFMPEG_BUILD)?.[1] ?? 99) < 7 ? '-filter_complex_script' : '-/filter_complex';
 const FONTS = ['C:/Windows/Fonts/seguisb.ttf', '/System/Library/Fonts/SFNS.ttf',
   '/System/Library/Fonts/Helvetica.ttc', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
   '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'];
@@ -185,7 +189,7 @@ async function renderBeat(root, take, cfg, beat, keys, logEvents, pieces, fileHa
   fs.writeFileSync(filter, graph);
   const tmp = tmpName(dest);
   try {
-    await ffmpeg([...inputs, '-filter_complex_script', filter, '-map', last, '-frames:v', String(beat.ticks.length), '-r', String(fps), ...ENCODER, '-y', tmp]);
+    await ffmpeg([...inputs, FILTER_FILE, filter, '-map', last, '-frames:v', String(beat.ticks.length), '-r', String(fps), ...ENCODER, '-y', tmp]);
     fs.renameSync(tmp, dest);
   } finally {
     for (const p of [list, filter, tmp]) { try { fs.unlinkSync(p); } catch {} }
