@@ -1,0 +1,63 @@
+# The whole suite on each OS: unit tests, then real headless shoots through Chrome, bash and ffmpeg.
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      # Keep what a failed test leaves behind in one place for the upload below.
+      TMPDIR: ${{ runner.temp }}
+      TEMP: ${{ runner.temp }}
+      TMP: ${{ runner.temp }}
+      GHOSTCAST_CACHE: ${{ runner.temp }}/ghostcast-cache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: ffmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
+      - name: git identity for test fixtures
+        run: |
+          git config --global user.name "ghostcast ci"
+          git config --global user.email "ci@example.invalid"
+      - run: npm ci
+      - run: node bin/ghostcast.mjs doctor
+      - run: npm test
+      - name: keep what failed tests left
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/ghostcast-*/**/*.png
+            ${{ runner.temp }}/ghostcast-*/**/*.json
+            ${{ runner.temp }}/ghostcast-*/**/*.log
+            ${{ runner.temp }}/ghostcast-*/**/*.md
+          if-no-files-found: ignore
+          retention-days: 7

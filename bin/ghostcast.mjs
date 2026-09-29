@@ -167,7 +167,8 @@ const commands = {
 
   async doctor() {
     let bad = 0;
-    const check = (name, ok, hint) => { console.log(`${ok ? 'ok  ' : 'MISS'}  ${name}${ok && typeof ok === 'string' ? `  (${ok})` : ''}${ok ? '' : `  — ${hint}`}`); if (!ok) bad++; };
+    // An optional tool is reported but does not fail the check: quick shoots never need it.
+    const check = (name, ok, hint, { optional = false } = {}) => { console.log(`${ok ? 'ok  ' : optional ? 'opt ' : 'MISS'}  ${name}${ok && typeof ok === 'string' ? `  (${ok})` : ''}${ok ? '' : `  — ${hint}`}`); if (!ok && !optional) bad++; };
     check('node >= 20', Number(process.versions.node.split('.')[0]) >= 20 && process.version, 'install Node 20+ (Playwright needs it)');
     // Dependencies are found the way Node finds them, wherever npm put them (npx hoists them).
     const need = createRequire(import.meta.url);
@@ -185,7 +186,7 @@ const commands = {
     check('Google Chrome', chrome.find((c) => fs.existsSync(c)), 'install Chrome, or set browser.channel in project.json (e.g. "msedge"), or run `npx playwright install chromium` and set it to "chromium"');
     check('ffmpeg', which('ffmpeg'), 'install ffmpeg and put it on PATH');
     check('ffprobe', which('ffprobe'), 'comes with ffmpeg');
-    check('VS Code CLI (only for editor scenes)', which('code'), 'install VS Code and its `code` command');
+    check('VS Code CLI (only for editor scenes)', which('code'), 'install VS Code and its `code` command', { optional: true });
     if (process.platform === 'win32') check('Git Bash (terminal scenes on Windows)', gitBash(), 'install Git for Windows');
     const cli = vscodeCliDir();
     let builds = [];
