@@ -1,3 +1,5 @@
+import { directCamera, fitSegment, motionIntervals } from './fit.mjs';
+
 export function smooth(k) {
   k = Math.max(0, Math.min(1, k));
   return k * k * k * (k * (k * 6 - 15) + 10);
@@ -65,7 +67,8 @@ export function windows(item, meta) {
     const a = base + (c.at ?? 0), b = (c.until ?? 'end') === 'end' ? end : base + c.until;
     out.push([c.text, a, Math.min(b, meta.duration), c.pos ?? 'bottom']);
   }
-  for (const s of meta.segments) if ((s.speed ?? 1) >= 1.5) out.push([speed_tag(s.speed), s.start, s.end, 'corner']);
+  for (const s of meta.segments) for (const p of s.pieces ?? [s])
+    if ((p.speed ?? 1) >= 1.5) out.push([speed_tag(p.speed), p.start, p.end, 'corner']);
   return out;
 }
 
@@ -76,13 +79,45 @@ export function captionPieces(caps, beat) {
   }));
 }
 
-export function beat_plan(log, frames, cfg, srcW, srcH) {
+export function beat_plan(log, frames, cfg, srcW, srcH, { targets = {}, readings = {}, unstable = {} } = {}) {
   const vp = log.find((e) => e[1] === 'viewport')?.[2];
-  const keys = view_track(log, srcW, srcH, vp ? srcW / vp.w : 1, cfg);
+  const directed = directCamera(log, cfg, srcW, srcH, vp ? srcW / vp.w : 1);
+  const keys = view_track(directed, srcW, srcH, vp ? srcW / vp.w : 1, cfg);
   const fps = cfg.output.fps, times = frames.map((f) => f[0]);
   const beats = [], meta = [], trims = cfg.trims ?? {}, speeds = cfg.speeds ?? {};
   let pos = 0;
   for (const s of segments(log)) {
+    const target = targets instanceof Map ? targets.get(s.name) : targets[s.name];
+    const reading = readings instanceof Map ? readings.get(s.name) : readings[s.name];
+    const bad = unstable instanceof Map ? unstable.get(s.name) : unstable[s.name];
+    const hasHold = log.some(([ms, label, data]) => label === 'hold' && data?.beat === s.name
+      && ms / 1000 >= s.a && ms / 1000 <= s.b);
+    if (target && hasHold) {
+      const intervals = motionIntervals(s, directed, cfg, bad ?? []);
+      const fit = fitSegment({ a: s.a, b: s.b, ...intervals, target, cfg, reading: reading ?? 0 });
+      const segmentStart = pos, pieceMeta = [];
+      fit.pieces.forEach((piece, index) => {
+        const n = Math.max(1, roundEven((piece.b - piece.a) / piece.speed * fps));
+        const ticks = [];
+        for (let i = 0; i < n; i++) {
+          const t = piece.a + i / fps * piece.speed;
+          let lo = 0, hi = times.length;
+          while (lo < hi) { const mid = (lo + hi) >> 1; if (times[mid] <= t) lo = mid + 1; else hi = mid; }
+          const j = Math.max(0, lo - 1);
+          ticks.push({ file: frames[j][1], stamp: frames[j][0], box: box_at(keys, t), sourceTime: t });
+        }
+        const from = pos;
+        pos += n / fps;
+        beats.push({ segment: s.name, piece: index, a: piece.a, b: piece.b, speed: piece.speed,
+          kind: piece.kind, start: from, end: pos, ticks });
+        pieceMeta.push({ start: Math.round(from * 1000) / 1000, end: Math.round(pos * 1000) / 1000, speed: piece.speed });
+      });
+      meta.push({ segment: s.name, start: Math.round(segmentStart * 1000) / 1000,
+        end: Math.round(pos * 1000) / 1000, speed: Math.max(...fit.pieces.map((p) => p.speed)),
+        pieces: pieceMeta, fit: Object.fromEntries(['natural', 'output', 'target', 'removed', 'speed', 'overrun', 'shortfall']
+          .map((key) => [key, fit[key]])) });
+      continue;
+    }
     const speed = s.speed * (speeds[s.name] ?? 1);
     const dur = Math.min((s.b - s.a) / speed, trims[s.name] ?? Infinity);
     const n = Math.max(1, roundEven(dur * fps));

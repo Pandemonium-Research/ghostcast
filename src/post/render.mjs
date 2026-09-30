@@ -4,10 +4,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
-import { beat_plan, windows, captionPieces } from './logic.mjs';
+import { beat_plan, windows, captionPieces, box_at, segments } from './logic.mjs';
+import { directCamera, fitTargets, motionIntervals, direction } from './fit.mjs';
 import { loadProject } from '../project.mjs';
 
-const VERSION = 'perspective-beats-8';
+const VERSION = 'perspective-beats-9';
 const ENCODER = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-tune', 'animation', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
 const FFMPEG_BUILD = spawnSync('ffprobe', ['-version'], { encoding: 'utf8' }).stdout?.split(/\r?\n/)[0] ?? 'unknown';
 // A beat's filter graph can pass Windows' 32 767-character command line, so it goes in a file.
@@ -213,8 +214,51 @@ export async function cut(root, take) {
   const raw = path.join(root, 'raw', take), frames = readJson(path.join(raw, 'frames.json')), log = readJson(path.join(raw, 'log.json'));
   if (!frames.length) throw new Error(`${take}: no frames`);
   const [w, h] = probeSize(path.join(raw, 'frames', frames[0][1]));
-  const plan = beat_plan(log, frames, cfg, w, h);
+  const { targets, readings } = fitTargets(root, take, log, cfg);
+  const unstable = {};
+  let plan;
+  for (let round = 0; round < 3; round++) {
+    plan = beat_plan(log, frames, cfg, w, h, { targets, readings, unstable });
+    const vp = log.find((e) => e[1] === 'viewport')?.[2];
+    const directed = directCamera(log, cfg, w, h, vp ? w / vp.w : 1);
+    const rejected = [];
+    for (const segment of segments(log)) {
+      if (!plan.meta.segments.some((s) => s.segment === segment.name && s.fit)) continue;
+      const parts = plan.beats.filter((beat) => beat.segment === segment.name);
+      const intervals = motionIntervals(segment, directed, cfg).still;
+      for (let i = 1; i < parts.length; i++) {
+        const left = parts[i - 1], right = parts[i];
+        if (right.a - left.b < 1e-6) continue;
+        const before = frames.filter(([ms]) => ms / 1000 <= left.b).at(-1) ?? frames[0];
+        const after = frames.find(([ms]) => ms / 1000 >= right.a) ?? frames.at(-1);
+        if (before[1] === after[1]) continue;
+        const box = box_at(plan.keys, left.b);
+        const x = Math.max(0, Math.min(w - 1, Math.round(box[0]))), y = Math.max(0, Math.min(h - 1, Math.round(box[1])));
+        const cw = Math.max(1, Math.min(w - x, Math.round(box[2]))), ch = Math.max(1, Math.min(h - y, Math.round(box[3])));
+        const view = `crop=${cw}:${ch}:${x}:${y},scale=480:-2,format=gray`;
+        const filter = `[0:v]${view}[a];[1:v]${view}[b];[a][b]ssim[out]`;
+        const report = await ffmpegStderr(['-i', path.join(raw, 'frames', before[1]), '-i', path.join(raw, 'frames', after[1]),
+          '-filter_complex', filter, '-map', '[out]', '-frames:v', '1', '-f', 'null', '-']);
+        const score = Number(/All:\s*([\d.]+)/.exec(report)?.[1]);
+        if (!Number.isFinite(score)) throw new Error(`${take} · ${segment.name}: ffmpeg did not report still SSIM`);
+        if (score < direction(cfg).stillSsim) {
+          const still = intervals.find((s) => s.a <= left.b + 1e-6 && s.b >= right.a - 1e-6);
+          if (still) rejected.push({ name: segment.name, span: { a: still.a, b: still.b } });
+        }
+      }
+    }
+    if (!rejected.length) break;
+    if (round === 2) throw new Error(`${take}: frame stability did not converge after three planning rounds`);
+    for (const { name, span } of rejected) (unstable[name] ??= []).push(span);
+  }
   if (!plan.beats.length) throw new Error(`${take}: no segments in log`);
+  for (const s of plan.meta.segments) if (s.fit) {
+    const note = [s.fit.output > s.fit.natural + .05 ? `held +${(s.fit.output - s.fit.natural).toFixed(1)} s` : `stills −${s.fit.removed.toFixed(1)} s`];
+    if (s.fit.speed > 1.001) note.push(`moves ${s.fit.speed.toFixed(1)}×`);
+    if (s.fit.overrun > .001) note.push(`overrun ${s.fit.overrun.toFixed(1)} s`);
+    if (s.fit.shortfall > .001) note.push(`shortfall ${s.fit.shortfall.toFixed(1)} s`);
+    console.log(`${take} · ${s.segment}: ${s.fit.natural.toFixed(1)} s → ${s.fit.output.toFixed(1)} s (${note.join(', ')})`);
+  }
   const item = (fs.existsSync(path.join(root, 'timeline.json')) ? readJson(path.join(root, 'timeline.json')).items : []).find((x) => x.take === take) ?? { take };
   const meta = { take, ...plan.meta }, caps = windows(item, meta);
   const hashes = new Map();
@@ -271,7 +315,8 @@ export async function assemble(root) {
       caps = windows(item, meta);
     }
     const manifest = readJson(manifestFile);
-    if (manifest.length !== meta.segments.length) throw new Error(`${item.take}: beat manifest does not match clip metadata; run cut again`);
+    if (manifest.length !== meta.segments.reduce((n, s) => n + (s.pieces?.length ?? 1), 0))
+      throw new Error(`${item.take}: beat manifest does not match clip metadata; run cut again`);
     const beatPaths = manifest.map((p) => path.resolve(root, p));
     paths.push(...beatPaths);
     const rows = [];
