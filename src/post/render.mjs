@@ -32,8 +32,14 @@ function captionSignature(root, cfg, caps) {
 async function runFfmpeg(args, capture) {
   return await new Promise((resolve, reject) => {
     const child = spawn('ffmpeg', ['-hide_banner', ...(capture ? [] : ['-loglevel', 'error']), ...args], { stdio: ['ignore', 'ignore', 'pipe'] });
-    try { os.setPriority(child.pid, process.platform === 'win32' ? os.constants.priority.PRIORITY_BELOW_NORMAL : 10); }
-    catch (e) { child.kill(); reject(new Error(`cannot lower ffmpeg priority: ${e.message}`)); return; }
+    // A quick run (an SSIM of two frames) can finish before this: a process that is gone (ESRCH)
+    // needs no lowering. Without a pid, spawn failed and 'error' reports it.
+    if (child.pid) {
+      try { os.setPriority(child.pid, process.platform === 'win32' ? os.constants.priority.PRIORITY_BELOW_NORMAL : 10); }
+      catch (e) {
+        if (!(e.info?.code === 'ESRCH' || /ESRCH/.test(e.message))) { child.kill(); reject(new Error(`cannot lower ffmpeg priority: ${e.message}`)); return; }
+      }
+    }
     let err = '';
     child.stderr.on('data', (x) => { err += x; });
     child.on('error', reject);

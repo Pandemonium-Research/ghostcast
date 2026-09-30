@@ -203,9 +203,20 @@ export function makeHelpers(project, page, log, world = null) {
       // in which nothing happens. Long commands wrap, so only their tail is checked.
       const want = cmd.length <= 80 ? cmd : cmd.slice(-40);
       let tail = '';
-      for (let t0 = Date.now(); Date.now() - t0 < 2000; await sleep(80)) {
-        tail = await lastRow();
-        if (tail.includes(want)) break;
+      const arrived = async () => {
+        for (let t0 = Date.now(); Date.now() - t0 < 2000; await sleep(80)) {
+          tail = await lastRow();
+          if (tail.includes(want)) return true;
+        }
+        return false;
+      };
+      // A loaded machine sometimes drops the last keys (seen on CI). When the row shows the command
+      // cut short, type the missing end once more.
+      if (!(await arrived()) && cmd.length <= 80) {
+        const shown = tail.trimEnd();
+        const missing = [...Array(Math.min(8, cmd.length - 1)).keys()].map((i) => i + 1)
+          .find((k) => shown.endsWith(cmd.slice(0, cmd.length - k)));
+        if (missing) { await h.type(cmd.slice(cmd.length - missing), { cps }); await arrived(); }
       }
       if (!tail.includes(want)) throw new Error(`run: "${cmd}" did not reach the terminal (last row: "${tail.trim()}")`);
       await sleep(jitter(280));
