@@ -79,5 +79,6 @@ jobs:
             ${{ runner.temp }}/ghostcast-*/**/*.json
             ${{ runner.temp }}/ghostcast-*/**/*.log
             ${{ runner.temp }}/ghostcast-*/**/*.md
+            ${{ runner.temp }}/ghostcast-*/*.gif
           if-no-files-found: ignore
           retention-days: 7
