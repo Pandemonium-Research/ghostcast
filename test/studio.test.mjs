@@ -640,9 +640,18 @@ test('runtime holds each beat and carries framing directly to a nearby beat', as
   assert.equal(events.filter(([label]) => label === 'holdend').length, 2);
   assert.deepEqual(events.filter(([label]) => label === 'show').map(([, data]) => data.text), ['First', 'Second']);
   assert.ok(sleeps.includes(4000), `capture hold ${JSON.stringify(sleeps)}`);
+  // A new surface resets the camera between beats; the command is typed framed on the prompt line,
+  // and with nothing to show the camera widens again for its output.
+  const prompt = { x: 0, y: 0, w: 200, h: 20 };
+  h.page.evaluate = async () => prompt;
+  h.terminal = { open: async () => events.push(['terminal']) };
+  await enter(h, { id: 'command', surface: 'terminal' }, { id: 'second', surface: 'web' });
   await perform(h, { id: 'command', surface: 'terminal', do: [{ run: 'echo ready' }] });
-  assert.ok(events.findIndex(([label]) => label === 'unfocus') < events.findIndex(([label]) => label === 'run'));
-  assert.equal(events.filter(([label]) => label === 'focus').length, 2);
+  const at = (label, from = 0) => events.findIndex(([l], i) => i >= from && l === label);
+  assert.ok(at('unfocus') >= 0 && at('unfocus') < at('terminal'), 'the web framing is released before the terminal opens');
+  assert.deepEqual(events.filter(([label]) => label === 'focus').map(([, rect]) => rect), [boxes.First, boxes.Second, prompt]);
+  assert.ok(at('focus', at('terminal')) < at('run'), 'the prompt is framed before typing');
+  assert.equal(events.filter(([label]) => label === 'unfocus').length, 2);
   h.rehearsal = true;
   await perform(h, { id: 'rehearsal', surface: 'web' });
   assert.equal(sleeps.at(-1), 300);

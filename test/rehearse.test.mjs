@@ -110,9 +110,13 @@ step('direction keeps adjacent web shots, widens before terminal actions, and fi
   const firstEnd = log.findIndex((entry) => entry[1] === '-first');
   const secondEnd = log.findIndex((entry) => entry[1] === '-second');
   assert.equal(log.slice(firstEnd, secondEnd).filter((entry) => entry[1] === 'unfocus').length, 0);
+  // The web framing is released between beats, before the terminal replaces the page; the command
+  // is typed framed on its prompt line, then the camera moves straight to the row it shows.
+  const commandStart = log.findIndex((entry) => entry[1] === '+command');
+  assert.equal(log.slice(secondEnd, commandStart).filter((entry) => entry[1] === 'unfocus').length, 1);
   const command = events('command');
-  assert.ok(command.findIndex((entry) => entry[1] === 'unfocus') < command.findIndex((entry) => entry[1] === 'show'));
-  assert.equal(command.filter((entry) => entry[1] === 'unfocus').length, 1);
+  assert.equal(command.filter((entry) => entry[1] === 'unfocus').length, 0);
+  assert.equal(command.filter((entry) => entry[1] === 'focus').length, 2);
   for (const beat of directed.beats) {
     const entries = events(beat.id);
     const hold = entries.findIndex((entry) => entry[1] === 'hold');

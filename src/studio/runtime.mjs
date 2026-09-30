@@ -53,6 +53,15 @@ export async function targetVisible(h, source, timeout = 15000) {
 }
 
 export async function enter(h, beat, previous) {
+  // A framing belongs to the page it framed. Before another surface or page replaces it, ease
+  // back to wide here, between beats, so the new beat does not open on an empty corner of it.
+  const replaces = beat.surface !== previous?.surface || beat.surface === 'panel'
+    || ((beat.surface === 'web' || beat.surface === 'terminal' || beat.surface === 'editor') && beat.open !== undefined);
+  if (h.storyboardFrame && replaces) {
+    h.unfocus();
+    h.storyboardFrame = null;
+    await h.sleep(800);
+  }
   if (beat.surface === 'web' && beat.open) {
     const open = beat.open;
     const url = /^(?:https?:|file:)/i.test(open) ? open : open.startsWith('/')
@@ -164,6 +173,16 @@ async function follow(h, target) {
   await h.sleep(800);
 }
 
+// The terminal's cursor row, from its left edge to the end of a command this long (as a quick
+// shoot frames it).
+function promptRect(h, length) {
+  return h.page.evaluate((n) => {
+    const term = window.__ghostcastTerminal, screen = document.querySelector('.xterm-screen').getBoundingClientRect();
+    const cell = { w: screen.width / term.cols, h: screen.height / term.rows };
+    return { x: screen.x, y: screen.y + term.buffer.active.cursorY * cell.h, w: Math.min(screen.width, (n + 3) * cell.w), h: cell.h };
+  }, length);
+}
+
 async function showText(h, found) {
   const { kind, value } = found.target;
   if (kind === 'row') return h.page.evaluate((match) => window.__rec.term.rows().filter((row) => row.includes(match)).at(-1) || '', value);
@@ -180,7 +199,15 @@ async function showText(h, found) {
 
 export async function perform(h, beat, code = {}) {
   const actions = beat.do || [];
-  if (h.storyboardFrame && (beat.camera === 'wide' || (actions.length && beat.camera !== 'follow'
+  // A terminal beat that starts with a command frames the prompt line while it is typed, wide
+  // enough for the command, then moves straight to what it shows: a mostly empty terminal page
+  // at full width is the weakest frame there is.
+  const firstRun = beat.surface === 'terminal' && beat.camera !== 'wide' && beat.camera !== 'follow' && actions[0]?.run;
+  if (firstRun) {
+    const command = typeof firstRun === 'string' ? firstRun : firstRun.cmd;
+    h.storyboardFrame = await h.focus(await promptRect(h, command.length));
+    await h.sleep(800);
+  } else if (h.storyboardFrame && (beat.camera === 'wide' || (actions.length && beat.camera !== 'follow'
     && !(await actionsInside(h, actions, h.storyboardFrame))))) {
     h.unfocus();
     h.storyboardFrame = null;
@@ -229,6 +256,12 @@ export async function perform(h, beat, code = {}) {
   if (beat.camera !== 'wide') {
     const target = beat.camera && beat.camera !== 'follow' ? await targetVisible(h, beat.camera) : found;
     if (target) await frame(h, target.element || target.rect);
+    else if (firstRun) {
+      // Nothing to show: the command's output needs the whole terminal.
+      h.unfocus();
+      h.storyboardFrame = null;
+      await h.sleep(800);
+    }
   }
   if (show) h.log('show', show);
   const policy = h.config.direction || {};
