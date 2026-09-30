@@ -203,20 +203,31 @@ export function makeHelpers(project, page, log, world = null) {
       // in which nothing happens. Long commands wrap, so only their tail is checked.
       const want = cmd.length <= 80 ? cmd : cmd.slice(-40);
       let tail = '';
-      const arrived = async () => {
-        for (let t0 = Date.now(); Date.now() - t0 < 2000; await sleep(80)) {
+      const arrived = async (ms) => {
+        for (let t0 = Date.now(); Date.now() - t0 < ms; await sleep(80)) {
           tail = await lastRow();
           if (tail.includes(want)) return true;
         }
         return false;
       };
-      // A loaded machine sometimes drops the last keys (seen on CI). When the row shows the command
-      // cut short, type the missing end once more.
-      if (!(await arrived()) && cmd.length <= 80) {
-        const shown = tail.trimEnd();
-        const missing = [...Array(Math.min(8, cmd.length - 1)).keys()].map((i) => i + 1)
-          .find((k) => shown.endsWith(cmd.slice(0, cmd.length - k)));
-        if (missing) { await h.type(cmd.slice(cmd.length - missing), { cps }); await arrived(); }
+      // On a loaded machine (seen on CI) the echo of the last keys can lag by seconds, and keys are
+      // sometimes lost. Wait long; retype the missing end only once the row has stopped changing,
+      // since retyping keys that are merely late would type them twice.
+      if (!(await arrived(6000)) && cmd.length <= 80) {
+        const settled = tail;
+        await sleep(1000);
+        tail = await lastRow();
+        if (tail === settled) {
+          // The longest start of the command the row ends with; a typed trailing space does not
+          // show, so at worst it is typed twice, which a shell ignores.
+          const shown = tail.trimEnd();
+          let typed = '';
+          for (let n = cmd.length - 1; n > 0 && !typed; n--) {
+            const start = cmd.slice(0, n).trimEnd();
+            if (start && shown.endsWith(start)) typed = start;
+          }
+          if (typed) { await h.type(cmd.slice(typed.length), { cps }); await arrived(3000); }
+        }
       }
       if (!tail.includes(want)) throw new Error(`run: "${cmd}" did not reach the terminal (last row: "${tail.trim()}")`);
       await sleep(jitter(280));
