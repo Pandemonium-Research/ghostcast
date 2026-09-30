@@ -706,3 +706,20 @@ test('a CRLF checkout of an approved storyboard keeps its approval and rehearsal
   fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/\n/g, '\r\n'));
   assert.equal(nextJson(dir).stage, 'rehearse');
 });
+
+test('pacing warns when fitting would play a beat\'s actions at 2× or more; open is off camera', (t) => {
+  const { studio } = init(t);
+  const story = structuredClone(sampleStory);
+  story.beats[0].do = [{ fill: { Search: 'release notes and changelogs' } }, { click: 'Search' }];
+  story.beats[0].say = 'Search for it.';
+  writeStory(studio, story);
+  const warning = lint(studio).warnings.find((p) => p.rule === 'pacing');
+  assert.match(warning?.message ?? '', /play at about \d+\.\d× to fit the line/);
+  story.beats[0].say = 'Search the registry for what you need, like release notes, and the matching skills appear.';
+  writeStory(studio, story);
+  assert.ok(!rules(studio, 'warnings').includes('pacing'));
+  delete story.beats[0].do;
+  story.beats[0].say = 'Ready.';
+  writeStory(studio, story);
+  assert.ok(!rules(studio, 'warnings').includes('pacing'), 'a beat that only opens a page has no on-camera actions');
+});

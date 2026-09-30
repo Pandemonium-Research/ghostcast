@@ -126,7 +126,12 @@ export function lint(dir) {
     const count = words(beat.say), budget = Math.floor(budgetSeconds * wps);
     if (!placeholder(beat.say) && count > budget) at('say', 'word-budget', 'error', `${count} words; the budget is ${budget} (${budgetSeconds} s at ${wps} words/s). Cut the line or set seconds`);
     const estimate = estimates.at(-1);
-    if (!beat.script && !placeholder(beat.say) && !containsPlaceholder(beat.do ?? beat.open) && estimate.actions > estimate.narration + 6) at('do', 'pacing', 'warning', 'actions outrun the narration by more than 6 s; shorten the picture or add narration');
+    // Post fits a beat to its line: after the final hold (about 1.8 s with its margins), the rest of
+    // the line is the room the actions get, and they play faster to fit it. `open` happens off
+    // camera, between beats, so it takes none of that room.
+    const pace = (estimate.actions - (beat.open ? 1.5 : 0)) / Math.max(.5, estimate.narration + .6 - 1.8);
+    if (!beat.script && beat.say && !placeholder(beat.say) && !containsPlaceholder(beat.do ?? beat.open) && pace >= 2)
+      at('do', 'pacing', 'warning', `its actions will play at about ${pace.toFixed(1)}× to fit the line (${estimate.actions.toFixed(1)} s of actions for ${estimate.narration.toFixed(1)} s of narration); say more, or split the beat`);
     if (['standard', 'production'].includes(storyboard.weight ?? brief.weight) && !beat.say) at('say', 'silent', 'warning', 'add narration or use quick weight');
     const actions = Array.isArray(beat.do) ? beat.do : [];
     const last = actions.at(-1);
@@ -160,7 +165,7 @@ export function formatLint(report) {
   const lines = [];
   for (const problem of [...report.errors, ...report.warnings]) {
     const location = `${problem.file}${problem.line ? `:${problem.line}` : ''}${problem.path ? ` ${problem.path}` : ''}${problem.id ? ` (${problem.id})` : ''}`;
-    lines.push(`${problem.level.padEnd(7)}${problem.rule.padEnd(19)}${location}: ${problem.message}`);
+    lines.push(`${problem.level.padEnd(8)}${problem.rule.padEnd(19)}${location}: ${problem.message}`);
   }
   lines.push('');
   lines.push('beat                 estimate  narration  actions');
