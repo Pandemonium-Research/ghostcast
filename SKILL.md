@@ -115,8 +115,10 @@ beats:
   product.
 - **camera**: the camera frames only `show`, keeps that framing into the next beat when it can,
   and eases back to wide before actions it would hide; a terminal command is typed with its
-  prompt line framed. Override per beat: `wide` never frames, `follow` frames each click and
-  fill as it happens, and a target (`camera: css .chart`) frames that instead of `show`.
+  prompt line framed. A target nearly as wide as the page gains nothing from a zoom, so it is
+  highlighted instead (a `line "…"` in the editor covers the whole line, wrapped or not).
+  Override per beat: `wide` never frames, `follow` frames each click and fill as it happens, and
+  a target (`camera: css .chart`) frames that instead of `show`.
 - **Timing**: write no sleeps or waits for pacing. Each beat is filmed with a long hold, then
   fitted to its line: still holds shorten first, then the moves play faster (tagged from 1.5×),
   and a cut never lands inside a move. Change a line and run `ghostcast cut storyboard` and

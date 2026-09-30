@@ -54,7 +54,7 @@ Name segments `<take>_<beat>`: captions and voice-over pieces refer to them by n
 | `h.unfocus()` | Eases back out to the full frame. |
 | `await h.mark(target, color, opts)` | Draws a highlight on the page. It is part of the capture and zooms with the content. `opts` is a padding, or `{pad, shape, glow}`: `shape` is `'rect'` (default), `'circle'` or `'pill'`, and `glow` adds a halo (`'bare'` for the halo alone, no ring). `'circle'` squares the box to its longer side and centres it, so a round target — a graph node — gets a ring rather than an ellipse. |
 | `await h.unmark()` | Fades every mark out. |
-| `await h.termRect(text, opts)` / `await h.editorRect(text, {editor, rows})` | Rectangles around terminal rows or editor lines, fitted to the text. Pass them to `focus` or `mark`. |
+| `await h.termRect(text, opts)` / `await h.editorRect(text, {editor, rows, logical})` | Rectangles around terminal rows or editor lines, fitted to the text. Pass them to `focus` or `mark`. With `logical: true`, editor rows count file lines, so a long wrapped line is taken whole. |
 
 A target narrower than the frame is needed for any zoom: a full-width block has nowhere to zoom
 to. Focus the heading, the line, or the row.

@@ -16,7 +16,7 @@ as work lands.
 | 2 | [Isolation](#stage-2--isolation) | 1 | Done: CI on Windows, macOS and Linux |
 | 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Done: first clip in 29 to 46 s on each OS |
 | 4 | [Plan](#stage-4--plan) | 2 | Done: a fresh agent reached an approved, rehearsed storyboard from SKILL.md alone |
-| 5 | [Direction](#stage-5--direction) | 4 | In progress: fitting and camera done; the editor beat awaits the VS Code license |
+| 5 | [Direction](#stage-5--direction) | 4 | Done: the Skilldex story shoots from a storyboard, side by side with the original |
 | 6 | [Checks](#stage-6--checks) | 4, 5 | Not started |
 | 7 | [Voice](#stage-7--voice) | 1, 4 | Not started |
 | 8 | [Delivery](#stage-8--delivery) | 1, 7 | Not started |
@@ -382,24 +382,33 @@ Progress:
   `camera: follow` override it. In post, moves that barely zoom are dropped, an unfocus followed
   by a focus becomes one move, each framing holds a minimum, and moves per minute are capped.
 - **The Skilldex story as a storyboard** (a scratch copy of the skill; the registry is the public
-  site): no sleeps, zooms or timestamps. The registry and validate beats shoot and fit to their
-  lines (16.8 s → 7.0 s and 20.5 s → 9.0 s of capture, nearly all by cutting still time).
+  site): three beats, no sleeps, zooms or timestamps, shot and fitted to their lines in 23 s
+  (16.8 s → 7.0 s, 20.8 s → 9.0 s and 11.6 s → 7.0 s of capture, nearly all by cutting still
+  time).
   Shortening both lines to one short sentence re-fits the cut with `cut` + `assemble`, no re-shoot
   (the moves then play at 3.4× and 4×, tagged); across every cut the camera's view moves 0 px and
   the frames either side have SSIM 1.000. Restoring the lines re-used every rendered piece.
 - **Side by side** with the hand-directed original (recovered from the bake-off's scene scripts
-  and re-shot): [the registry beat](docs/direction/registry-side-by-side.jpg) frames the same
-  search and first result, at 7.0 s against the original's 9.9 s of hand-set sleeps; [the
-  validate beat](docs/direction/validate-storyboard.jpg) types on a framed prompt and then frames
-  the score, where the original opened on a mostly empty terminal. The original still has two
-  things the storyboard lacks: a highlight ring on the result, and captions. Captions come with
-  stage 8; a highlight on `show` is a follow-up.
+  and re-shot; the original on top):
+  - [registry](docs/direction/registry-side-by-side.jpg): the same search and first result, at
+    7.0 s against the original's 9.9 s of hand-set sleeps; the original also rings the result;
+  - [validate](docs/direction/validate-side-by-side.jpg): the storyboard types on a framed prompt
+    and frames the score, where the original types in small text in a mostly empty panel;
+  - [skill file](docs/direction/skill-file-side-by-side.jpg): both highlight the description,
+    which is too wide to zoom; the storyboard's ring covers exactly its three wrapped lines.
+
+  The original's captions are the one thing still missing; they come with stage 8.
 - **Found and fixed while filming:** a web framing carried into a terminal beat, which opened on
   an empty corner of its page; typing in small text on an empty terminal; and a lint that could
   not tell a line too short for its actions (it now estimates the playback speed and warns from
   2×).
-- **Left:** the editor beat (SKILL.md in VS Code in the browser), which needs the VS Code Server
-  license accepted for this project.
+- **Found and fixed with the editor beat:** `ghostcast vscode` failed in a studio folder (no
+  `vscode/`), and ran VS Code without ghostcast's settings or clean bash there (it now falls back
+  to the package's); a target nearly as wide as the page, which a zoom cannot help, is now
+  highlighted instead; an editor `line` target covers a wrapped line whole; and on Windows,
+  VS Code keeps the world copy it served open, so removing it failed the shoot. Cleanup now
+  warns and leaves the copy for the next shoot to remove, and rehearsal writes its report
+  however cleanup goes.
 
 Decided (defaults in project.json `direction`, to tune in stage 6): reading 3 words a second plus
 0.5 s; minimum hold 1.5 s; minimum beat 2 s; 12 moves a minute; a move must zoom at least 1.2×;
