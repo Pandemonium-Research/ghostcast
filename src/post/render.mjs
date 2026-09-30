@@ -50,7 +50,7 @@ async function runFfmpeg(args, capture) {
 export async function ffmpeg(args) { return runFfmpeg(args, false); }
 export async function ffmpegStderr(args) { return runFfmpeg(args, true); }
 
-function probeSize(p) {
+export function probeSize(p) {
   const r = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=width,height', '-of', 'json', p], { encoding: 'utf8' });
   if (r.status !== 0) throw new Error(`ffprobe failed for ${p}: ${r.stderr}`);
   const { width, height } = JSON.parse(r.stdout).streams[0];

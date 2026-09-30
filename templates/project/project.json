@@ -10,5 +10,6 @@
     "stillSsim": 0.995 },
   "captions": { "size": 34 },
   "voiceover": { "wordsPerSecond": 2.5, "lufs": -16 },
+  "checks": { "minTextPx": 16, "minShowPx": 20, "captionMaxSeconds": 8, "frozenSeconds": 4, "emptyShare": 0.88, "emptyInk": 0.01, "captionInk": 0.03 },
   "trims": {}
 }

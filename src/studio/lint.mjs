@@ -51,11 +51,11 @@ export function estimateBeat(beat, wps) {
 // Only what the agent writes is scanned: text files at the top of the folder, and under panels/ and
 // scenes/. The rest of the folder is footage, renders and a browser profile.
 const TEXT = /\.(?:md|ya?ml|json|m?js|html|css|txt)$/i;
-const KNOWN_TOKEN = /(?:sk-[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9_]{12,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|xox[a-z0-9]*-[A-Za-z0-9-]{10,})/g;
+export const KNOWN_TOKEN = /(?:sk-[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9_]{12,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|xox[a-z0-9]*-[A-Za-z0-9-]{10,})/g;
 // A long run of hex or base64 is a secret only when it mixes digits and letters (and, for base64,
 // both cases): paths and words make long runs too.
-const LONG_RUN = /(?<![A-Za-z0-9_+/=-])(?:[a-fA-F0-9]{32,}|[A-Za-z0-9+/]{40,}={0,2})(?![A-Za-z0-9_+/=-])/g;
-const random = (run) => /\d/.test(run) && /[a-z]/i.test(run) && (/^[a-f0-9]+$/i.test(run) || (/[a-z]/.test(run) && /[A-Z]/.test(run) && (run.match(/\//g) || []).length < 3));
+export const LONG_RUN = /(?<![A-Za-z0-9_+/=-])(?:[a-fA-F0-9]{32,}|[A-Za-z0-9+/]{40,}={0,2})(?![A-Za-z0-9_+/=-])/g;
+export const randomToken = (run) => /\d/.test(run) && /[a-z]/i.test(run) && (/^[a-f0-9]+$/i.test(run) || (/[a-z]/.test(run) && /[A-Z]/.test(run) && (run.match(/\//g) || []).length < 3));
 
 function secretProblems(dir) {
   const problems = [];
@@ -74,7 +74,7 @@ function secretProblems(dir) {
   walk(path.join(dir, 'scenes'), true);
   for (const full of files) {
     const content = fs.readFileSync(full, 'utf8');
-    const found = [...content.matchAll(KNOWN_TOKEN), ...[...content.matchAll(LONG_RUN)].filter((m) => random(m[0]))];
+    const found = [...content.matchAll(KNOWN_TOKEN), ...[...content.matchAll(LONG_RUN)].filter((m) => randomToken(m[0]))];
     for (const match of found) problems.push({ file: path.relative(dir, full).replace(/\\/g, '/'), path: '',
       line: content.slice(0, match.index).split('\n').length, message: 'possible literal key or token; remove it and use an environment variable' });
   }

@@ -112,6 +112,13 @@ export function makeHelpers(project, page, log, world = null) {
   let terminalExited = null;
   let terminalExitCode = null;
 
+  const facts = async (at = Date.now()) => {
+    try {
+      const value = await page.evaluate(() => window.__rec?.facts?.() ?? null);
+      if (value && typeof value.text === 'string' && Array.isArray(value.boxes)) log.push([at, 'facts', value]);
+    } catch { /* navigation can temporarily leave a document without the driver */ }
+  };
+
   const closeTerminal = () => {
     terminalData?.dispose();
     terminalData = null;
@@ -123,7 +130,11 @@ export function makeHelpers(project, page, log, world = null) {
 
   const h = {
     page, project, config: project.config, world, sleep,
-    log(label, data) { log.push(data === undefined ? [Date.now(), label] : [Date.now(), label, data]); },
+    log(label, data) {
+      const at = Date.now();
+      log.push(data === undefined ? [at, label] : [at, label, data]);
+      if (label === 'focus' || label === 'show' || label === 'hold' || label.startsWith('+') || label.startsWith('-')) void facts(at);
+    },
     rect: rectOf,
     // A click can navigate without going through h.goto, leaving the new document without the
     // in-page cursor and rectangle driver. Restore it before the next storyboard action.

@@ -109,6 +109,31 @@
 
   const R = {
     sleep, q, findText, textBox,
+    facts() {
+      const viewport = { x: 0, y: 0, w: innerWidth, h: innerHeight };
+      const boxes = [];
+      const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_ELEMENT);
+      for (let el = walker.nextNode(); el && boxes.length < 200; el = walker.nextNode()) {
+        if (el.id?.startsWith('__rec_') || el.closest?.('#__rec_cursor,#__rec_hb,.__rec_mark')) continue;
+        const own = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.nodeValue || '').join(' ').replace(/\s+/g, ' ').trim();
+        if (!own) continue;
+        const style = getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
+        const r = el.getBoundingClientRect();
+        const x = Math.max(0, r.left), y = Math.max(0, r.top), right = Math.min(innerWidth, r.right), bottom = Math.min(innerHeight, r.bottom);
+        if (right <= x || bottom <= y) continue;
+        const px = Number.parseFloat(style.fontSize) || 0;
+        boxes.push({ t: own.slice(0, 80), px, x, y, w: right - x, h: bottom - y });
+      }
+      boxes.sort((a, b) => a.y - b.y || a.x - b.x);
+      let text = '', used = 0;
+      for (const b of boxes) {
+        const next = `${text ? '\n' : ''}${b.t}`;
+        if (used + next.length > 6000) { text += next.slice(0, Math.max(0, 6000 - used)); break; }
+        text += next; used += next.length;
+      }
+      return { text, boxes };
+    },
     get pos() { return [state.x, state.y]; },
     async move(t, ms = 750) {
       const { x, y } = center(t);

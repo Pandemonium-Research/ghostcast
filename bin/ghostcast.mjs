@@ -23,6 +23,7 @@ const HELP = `ghostcast — a recording studio for coding agents
   ghostcast init <dir>                  create a sample project
   ghostcast template <type> [--force]   write a launch, how-to, feature or receipt storyboard
   ghostcast lint [--json]               check the studio plan and its timing
+  ghostcast check [--report <file>] [--json] check the current assembled cut
   ghostcast approve storyboard          record approval of the lint-clean storyboard
   ghostcast next [--json]               report the first unfinished studio stage and next action
   ghostcast compile                     generate cache/storyboard.mjs and timeline.json
@@ -236,6 +237,18 @@ const commands = {
     if (report.errors.length) process.exitCode = 1;
   },
 
+  async check() {
+    const json = flag('--json'), reportFile = opt('--report', null);
+    if (argv.length) die('usage: ghostcast check [--report <file>] [--json]');
+    const { checkProject, formatCheck, writeCheckReport } = await import('../src/check/index.mjs');
+    try {
+      const report = checkProject(projectDir);
+      const paths = writeCheckReport(projectDir, report, reportFile);
+      console.log(json ? JSON.stringify({ ...report, files: paths }, null, 2) : formatCheck(report));
+      if (report.errors) process.exitCode = 1;
+    } catch (e) { die(e.stack || e.message); }
+  },
+
   async approve() {
     if (argv.length !== 1 || argv[0] !== 'storyboard') die('usage: ghostcast approve storyboard');
     const { approveStoryboard } = await import('../src/studio/approve.mjs');
@@ -346,7 +359,15 @@ const commands = {
       world = existing ? openWorld(existing) : await prepareWorld((await import('../src/recorder.mjs')).loadProject(projectDir), { keep });
       ok = await record(take, headed, world);
     } catch (e) { console.error(e.stack || e.message); }
-    finally { if (world?.dispose) untouched = await world.dispose(); }
+    finally {
+      if (world?.dispose) untouched = await world.dispose();
+      if (world) {
+        const result = typeof untouched === 'object' ? untouched : { ok: !!untouched, changed: [], leaks: [] };
+        untouched = !!result.ok;
+        const dir = path.join(projectDir, 'raw', take); fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, 'world.json'), JSON.stringify({ untouched: !!result.ok, leaks: result.leaks || [], changed: result.changed || [] }, null, 2));
+      }
+    }
     process.exit(ok && untouched ? 0 : 1);
   },
 
@@ -381,8 +402,24 @@ const commands = {
       }
       try { const { assemble } = await import('../src/post/render.mjs'); await assemble(projectDir); } catch (e) { console.error(e); code = 1; }
     } catch (e) { console.error(e.stack || e.message); code = 1; }
-    finally { if (world) untouched = await world.dispose(); }
+    finally {
+      if (world) untouched = await world.dispose();
+      const result = typeof untouched === 'object' ? untouched : { ok: !!untouched, changed: [], leaks: [] };
+      untouched = !!result.ok;
+      if (world) for (const take of takes) {
+        const dir = path.join(projectDir, 'raw', take);
+        if (!fs.existsSync(dir)) continue;
+        fs.writeFileSync(path.join(dir, 'world.json'), JSON.stringify({ untouched: !!result.ok, leaks: result.leaks || [], changed: result.changed || [] }, null, 2));
+      }
+    }
     if (failed.length) { console.error(`failed: ${failed.join(', ')}`); code = 1; }
+    try {
+      const { checkProject, formatCheck, writeCheckReport } = await import('../src/check/index.mjs');
+      // The shoot succeeded whatever the checks find: they are a report, and `next` gates on it.
+      const report = checkProject(projectDir);
+      const { report: file } = writeCheckReport(projectDir, report);
+      console.log(`checks: ${report.errors} errors, ${report.warnings} warnings (${path.relative(process.cwd(), file)})`);
+    } catch (e) { console.error(`checks could not run: ${e.message}`); }
     process.exit(code || !untouched ? 1 : 0);
   },
 };
