@@ -29,7 +29,8 @@ function fingerprint() {
 }
 
 fs.mkdirSync(repo);
-fs.writeFileSync(path.join(repo, 'page.html'), '<!doctype html><title>Demo</title><button onclick="document.querySelector(\'#result\').hidden=false">Reveal</button><p id="result" hidden>It worked</p>\n');
+fs.writeFileSync(path.join(repo, 'page.html'), '<!doctype html><title>Demo</title><button onclick="document.querySelector(\'#result\').hidden=false">Reveal</button><p id="result" hidden>It worked</p><main><span>First finding</span><span style="margin-left:80px">Second finding</span></main><a href="next.html">Browse registry</a>\n');
+fs.writeFileSync(path.join(repo, 'next.html'), '<!doctype html><title>Next</title><button onclick="document.querySelector(\'#loaded\').hidden=false">Show loaded result</button><p id="loaded" hidden>Loaded result</p>\n');
 good(run('git', ['init', '-q']));
 good(run('git', ['-c', 'user.name=Ghostcast Test', '-c', 'user.email=test@example.invalid', 'add', '.']));
 good(run('git', ['-c', 'user.name=Ghostcast Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'initial']));
@@ -84,5 +85,67 @@ step('all records one storyboard take segmented by beat ids', () => {
   const raw = path.join(studio, 'raw', 'storyboard');
   const log = JSON.parse(fs.readFileSync(path.join(raw, 'log.json'), 'utf8'));
   assert.deepEqual(log.filter((entry) => entry[1].startsWith('+')).map((entry) => entry[1].slice(1)), story.beats.map((beat) => beat.id));
+  assert.deepEqual(fingerprint(), before);
+});
+
+step('direction keeps adjacent web shots, widens before terminal actions, and fits holds', () => {
+  const directed = { ...story, beats: [
+    { id: 'first', surface: 'web', open: 'page.html', show: 'text "First finding"',
+      say: 'The first finding is clearly visible on this page.' },
+    { id: 'second', surface: 'web', show: 'text "Second finding"',
+      say: 'The second finding sits right beside the first.' },
+    { id: 'command', surface: 'terminal', do: [{ run: 'echo ready' }], show: 'row "ready"',
+      say: 'A terminal command confirms that the system is ready.' },
+  ] };
+  fs.writeFileSync(path.join(studio, 'storyboard.yaml'), YAML.stringify(directed));
+  good(run(process.execPath, [CLI, 'rehearse', '--runs', '1']));
+  const rehearsal = JSON.parse(fs.readFileSync(path.join(studio, 'cache', 'rehearsal.json'), 'utf8'));
+  assert.deepEqual(rehearsal.beats.map((beat) => beat.status), ['pass', 'pass', 'pass']);
+  assert.ok(rehearsal.beats[1].ms[0] < 3000, `second rehearsal beat took ${rehearsal.beats[1].ms[0]} ms`);
+
+  good(run(process.execPath, [CLI, 'all']));
+  const log = JSON.parse(fs.readFileSync(path.join(studio, 'raw', 'storyboard', 'log.json'), 'utf8'));
+  const events = (id) => log.slice(log.findIndex((entry) => entry[1] === `+${id}`), log.findIndex((entry) => entry[1] === `-${id}`) + 1);
+  for (const id of ['first', 'second']) assert.equal(events(id).filter((entry) => entry[1] === 'focus').length, 1, id);
+  const firstEnd = log.findIndex((entry) => entry[1] === '-first');
+  const secondEnd = log.findIndex((entry) => entry[1] === '-second');
+  assert.equal(log.slice(firstEnd, secondEnd).filter((entry) => entry[1] === 'unfocus').length, 0);
+  const command = events('command');
+  assert.ok(command.findIndex((entry) => entry[1] === 'unfocus') < command.findIndex((entry) => entry[1] === 'show'));
+  assert.equal(command.filter((entry) => entry[1] === 'unfocus').length, 1);
+  for (const beat of directed.beats) {
+    const entries = events(beat.id);
+    const hold = entries.findIndex((entry) => entry[1] === 'hold');
+    const end = entries.findIndex((entry) => entry[1] === 'holdend');
+    assert.ok(hold >= 0 && end > hold, beat.id);
+    assert.equal(entries.filter((entry) => entry[1] === 'hold').length, 1);
+    assert.equal(entries.filter((entry) => entry[1] === 'holdend').length, 1);
+    assert.deepEqual(entries[hold][2], { beat: beat.id });
+    assert.equal(entries.slice(hold + 1, end).filter((entry) => ['focus', 'unfocus', 'show'].includes(entry[1])).length, 0);
+    assert.ok(entries.findIndex((entry) => entry[1] === 'show') < hold);
+    const shown = entries.find((entry) => entry[1] === 'show')[2];
+    assert.ok(shown.text && ['x', 'y', 'w', 'h'].every((key) => Number.isFinite(shown.rect[key])), beat.id);
+  }
+  assert.match(events('first').find((entry) => entry[1] === 'show')[2].text, /First finding/);
+  assert.match(events('second').find((entry) => entry[1] === 'show')[2].text, /Second finding/);
+  assert.match(events('command').find((entry) => entry[1] === 'show')[2].text, /ready/);
+  const clips = JSON.parse(fs.readFileSync(path.join(studio, 'clips', 'storyboard.json'), 'utf8'));
+  for (const beat of directed.beats) {
+    const fit = clips.segments.find((segment) => segment.segment === beat.id)?.fit;
+    assert.ok(fit, `${beat.id} has a fit`);
+    assert.ok(Math.abs(fit.output - fit.target) < 0.75, `${beat.id}: ${JSON.stringify(fit)}`);
+  }
+  assert.deepEqual(fingerprint(), before);
+});
+
+step('a click navigation restores the driver for the next action in the same beat', () => {
+  fs.writeFileSync(path.join(studio, 'storyboard.yaml'), YAML.stringify({ ...story, beats: [
+    { id: 'navigate', surface: 'web', open: 'page.html',
+      do: [{ click: 'Browse registry' }, { click: 'Show loaded result' }],
+      show: 'text "Loaded result"', say: 'The linked page shows its loaded result.' },
+  ] }));
+  good(run(process.execPath, [CLI, 'rehearse', '--runs', '1']));
+  const report = JSON.parse(fs.readFileSync(path.join(studio, 'cache', 'rehearsal.json'), 'utf8'));
+  assert.equal(report.beats[0].status, 'pass');
   assert.deepEqual(fingerprint(), before);
 });

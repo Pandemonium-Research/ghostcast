@@ -12,6 +12,7 @@ import { lint } from '../src/studio/lint.mjs';
 import { validateAudio, validateBrief, validateProduct, validateStoryboard, validateWorld } from '../src/studio/schema.mjs';
 import { compile } from '../src/studio/compile.mjs';
 import { parseTarget } from '../src/studio/target.mjs';
+import { enter, perform } from '../src/studio/runtime.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'bin', 'ghostcast.mjs');
@@ -601,6 +602,69 @@ test('target parser accepts every form and rejects junk', () => {
   story.beats[0].show = 'text "Done"';
   story.beats[0].do = [{ wait: 'text Done' }];
   assert.ok(validateStoryboard(YAML.stringify(story)).some((p) => p.path === 'beats[0].do[0].wait'));
+});
+
+test('camera accepts wide, follow, or a valid target and rejects other values', () => {
+  for (const camera of ['wide', 'follow', 'text "Ready"', 'row "ready"', 'line "const ready"',
+    'role button "Save"', 'label "Name"', 'css .result']) {
+    const story = structuredClone(sampleStory);
+    story.beats[0].camera = camera;
+    assert.deepEqual(validateStoryboard(YAML.stringify(story)).filter((p) => p.path === 'beats[0].camera'), [], camera);
+  }
+  for (const camera of ['zoom', 'text Ready', 'role "Save"', 'css ', '', 3, null]) {
+    const story = structuredClone(sampleStory);
+    story.beats[0].camera = camera;
+    assert.ok(validateStoryboard(YAML.stringify(story)).some((p) => p.path === 'beats[0].camera'), String(camera));
+  }
+});
+
+test('runtime holds each beat and carries framing directly to a nearby beat', async () => {
+  const boxes = { First: { x: 100, y: 100, w: 100, h: 30 }, Second: { x: 260, y: 100, w: 100, h: 30 } };
+  const element = (text) => {
+    const loc = { box: boxes[text], count: async () => 1, nth: () => loc, isVisible: async () => true,
+      evaluate: async () => 16, innerText: async () => text };
+    return loc;
+  };
+  const events = [], sleeps = [];
+  const h = { config: { voiceover: { wordsPerSecond: 2.5 }, direction: { captureHold: 1.5 } },
+    page: { getByText: (text) => element(text), url: () => 'file:///test.html' },
+    rect: async (target) => target.box || target,
+    focus: async (target) => { const rect = target.box || target; events.push(['focus', rect]); return rect; },
+    unfocus: () => events.push(['unfocus']), log: (label, data) => events.push([label, data]),
+    sleep: async (ms) => sleeps.push(ms), run: async () => events.push(['run']), ensureDriver: async () => {} };
+  await perform(h, { id: 'first', surface: 'web', show: 'text "First"', say: 'Five words take two seconds.' });
+  await perform(h, { id: 'second', surface: 'web', show: 'text "Second"', say: 'Second result.' });
+  assert.deepEqual(events.filter(([label]) => label === 'focus').map(([, rect]) => rect), [boxes.First, boxes.Second]);
+  assert.equal(events.filter(([label]) => label === 'unfocus').length, 0);
+  assert.deepEqual(events.filter(([label]) => label === 'hold').map(([, data]) => data), [{ beat: 'first' }, { beat: 'second' }]);
+  assert.equal(events.filter(([label]) => label === 'holdend').length, 2);
+  assert.deepEqual(events.filter(([label]) => label === 'show').map(([, data]) => data.text), ['First', 'Second']);
+  assert.ok(sleeps.includes(4000), `capture hold ${JSON.stringify(sleeps)}`);
+  await perform(h, { id: 'command', surface: 'terminal', do: [{ run: 'echo ready' }] });
+  assert.ok(events.findIndex(([label]) => label === 'unfocus') < events.findIndex(([label]) => label === 'run'));
+  assert.equal(events.filter(([label]) => label === 'focus').length, 2);
+  h.rehearsal = true;
+  await perform(h, { id: 'rehearsal', surface: 'web' });
+  assert.equal(sleeps.at(-1), 300);
+});
+
+test('editor open names a file in the world copy or keeps folder behavior', async (t) => {
+  const root = fixture(t);
+  fs.mkdirSync(path.join(root, 'src'));
+  fs.writeFileSync(path.join(root, 'src', 'app.ts'), 'const ready = true;\n');
+  const calls = [];
+  const h = { world: { dir: root }, project: { root: path.join(root, 'project') },
+    vscode: { open: async (...args) => calls.push(['open', ...args]), openFile: async (...args) => calls.push(['openFile', ...args]),
+      command: async (...args) => calls.push(['command', ...args]) } };
+  await enter(h, { surface: 'editor', open: 'src/app.ts' });
+  assert.deepEqual(calls, [['open', '.', { sidebar: false, maximize: false }], ['openFile', 'src/app.ts'],
+    ['command', 'View: Close Panel']]);
+  calls.length = 0;
+  await enter(h, { surface: 'editor', open: 'src' });
+  assert.deepEqual(calls, [['open', 'src']]);
+  h.vscode.open = async () => { throw new Error('server unavailable'); };
+  await assert.rejects(enter(h, { surface: 'editor', open: 'src' }),
+    /ghostcast vscode --accept-server-license-terms from the project's root after reading the VS Code Server license/);
 });
 
 test('a web beat after another surface, or first, needs open; compile refuses it', (t) => {

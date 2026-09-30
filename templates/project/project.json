@@ -5,7 +5,7 @@
   "browser": { "channel": "chrome" },
   "vscode": { "url": "http://127.0.0.1:8765", "tokenFile": "vscode/token" },
   "zoom": { "max": 2, "fill": 0.62 },
-  "direction": { "readingWordsPerSecond": 3, "readingBase": 0.5, "minHold": 1.5,
+  "direction": { "readingWordsPerSecond": 3, "readingBase": 0.5, "minHold": 1.5, "captureHold": 1.5,
     "minBeat": 2, "movesPerMinute": 12, "minZoomGain": 1.2, "maxSpeed": 12,
     "stillSsim": 0.995 },
   "captions": { "size": 34 },

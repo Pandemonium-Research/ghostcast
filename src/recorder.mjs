@@ -124,6 +124,16 @@ export function makeHelpers(project, page, log, world = null) {
   const h = {
     page, project, config: project.config, world, sleep,
     log(label, data) { log.push(data === undefined ? [Date.now(), label] : [Date.now(), label, data]); },
+    rect: rectOf,
+    // A click can navigate without going through h.goto, leaving the new document without the
+    // in-page cursor and rectangle driver. Restore it before the next storyboard action.
+    async ensureDriver({ cursor = true } = {}) {
+      const present = await page.evaluate(() => !!window.__rec).catch(() => false);
+      if (present) return;
+      await page.waitForLoadState('load', { timeout: 60000 });
+      await inject(page, { cursor });
+      await page.evaluate(() => window.__rec.heartbeat(true));
+    },
 
     // cut.py keeps a little footage either side of a segment; the pauses keep off-camera work (a
     // palette opening, a layout change) out of that margin. A name ending "@4x" plays sped up;
@@ -410,6 +420,7 @@ function vscodeHelpers(h) {
       }
       // Panel size is remembered too, so a take could start with whatever the last one left.
       if (maximize && !(await v.panelMaximized())) await v.command('View: Toggle Maximized Panel');
+      if (!maximize && await v.panelMaximized()) await v.command('View: Toggle Maximized Panel');
       await v.focusTerminal();
       await v.clearTerm();
       await page.evaluate(() => { window.__rec.hide(); window.__rec.heartbeat(true); });

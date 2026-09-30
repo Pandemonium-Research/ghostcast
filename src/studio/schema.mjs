@@ -169,6 +169,8 @@ export function validateStoryboard(source, brief = {}) {
     for (const key of ['claim', 'open', 'say', 'camera']) if (beat[key] !== undefined && !text(beat[key])) c.add([...root, key], 'use non-empty text');
     if (beat.seconds !== undefined && !seconds(beat.seconds)) c.add([...root, 'seconds'], 'set non-negative seconds');
     if (beat.show !== undefined && !target(beat.show)) c.add([...root, 'show'], 'use text "…", row "…", line "…", role <role> "…", label "…", or css <selector>');
+    if (beat.camera !== undefined && beat.camera !== 'wide' && beat.camera !== 'follow' && !target(beat.camera))
+      c.add([...root, 'camera'], 'use wide, follow, or a target: text "…", row "…", line "…", role <role> "…", label "…", or css <selector>');
     if (beat.script !== undefined) {
       if (!text(beat.script) || !/^scenes\/[a-zA-Z0-9_./-]+$/.test(beat.script) || beat.script.split('/').includes('..')) c.add([...root, 'script'], 'use a path under scenes/');
       if (beat.open !== undefined || beat.do !== undefined) c.add([...root, 'script'], 'a script beat cannot also have open or do');

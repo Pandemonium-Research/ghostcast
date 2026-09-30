@@ -43,6 +43,7 @@ export async function rehearse(project, { ids = [], runs = 3, headed = false } =
       try {
         ({ ctx, page } = await launch(project, { headed, world }));
         h = makeHelpers(project, page, log, world);
+        h.rehearsal = true;
         for (let i = 0; i < selected.length; i++) {
           const entry = entries[i], beat = selected[i], start = Date.now();
           entry.reached++;
