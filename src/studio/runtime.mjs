@@ -96,7 +96,14 @@ export async function enter(h, beat, previous) {
       await h.goto(u.href, { cursor: false });
     } else await h.goto(h.fileUrl(panel.html, panel.data || {}), { cursor: false });
   }
+  // A beat that types a command opens already framed on its prompt: the ease happens here, off
+  // camera. Not for the first beat, whose enter runs before capture (its log is discarded).
+  const run = firstRun(beat);
+  if (run && previous) await frame(h, await promptRect(h, command(run).length));
 }
+
+const command = (run) => typeof run === 'string' ? run : run.cmd;
+const firstRun = (beat) => beat.surface === 'terminal' && beat.camera !== 'wide' && beat.camera !== 'follow' && beat.do?.[0]?.run;
 
 async function clickTarget(h, source, timeout = 10000) {
   if (QUOTED.test(source)) {
@@ -202,12 +209,9 @@ export async function perform(h, beat, code = {}) {
   // A terminal beat that starts with a command frames the prompt line while it is typed, wide
   // enough for the command, then moves straight to what it shows: a mostly empty terminal page
   // at full width is the weakest frame there is.
-  const firstRun = beat.surface === 'terminal' && beat.camera !== 'wide' && beat.camera !== 'follow' && actions[0]?.run;
-  if (firstRun) {
-    const command = typeof firstRun === 'string' ? firstRun : firstRun.cmd;
-    h.storyboardFrame = await h.focus(await promptRect(h, command.length));
-    await h.sleep(800);
-  } else if (h.storyboardFrame && (beat.camera === 'wide' || (actions.length && beat.camera !== 'follow'
+  const run = firstRun(beat);
+  if (run) await frame(h, await promptRect(h, command(run).length));
+  else if (h.storyboardFrame && (beat.camera === 'wide' || (actions.length && beat.camera !== 'follow'
     && !(await actionsInside(h, actions, h.storyboardFrame))))) {
     h.unfocus();
     h.storyboardFrame = null;
@@ -256,7 +260,7 @@ export async function perform(h, beat, code = {}) {
   if (beat.camera !== 'wide') {
     const target = beat.camera && beat.camera !== 'follow' ? await targetVisible(h, beat.camera) : found;
     if (target) await frame(h, target.element || target.rect);
-    else if (firstRun) {
+    else if (run) {
       // Nothing to show: the command's output needs the whole terminal.
       h.unfocus();
       h.storyboardFrame = null;

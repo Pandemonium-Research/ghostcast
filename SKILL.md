@@ -113,7 +113,15 @@ beats:
 - **panel**: `{ use: title | chapter | cta, title, subtitle, foot }`, or `{ html: panels/x.html,
   data: {…} }`. Panels frame the story, at most a fifth of the runtime; they never mock the
   product.
-- **camera**: `wide` keeps the full frame for that beat.
+- **camera**: the camera frames only `show`, keeps that framing into the next beat when it can,
+  and eases back to wide before actions it would hide; a terminal command is typed with its
+  prompt line framed. Override per beat: `wide` never frames, `follow` frames each click and
+  fill as it happens, and a target (`camera: css .chart`) frames that instead of `show`.
+- **Timing**: write no sleeps or waits for pacing. Each beat is filmed with a long hold, then
+  fitted to its line: still holds shorten first, then the moves play faster (tagged from 1.5×),
+  and a cut never lands inside a move. Change a line and run `ghostcast cut storyboard` and
+  `ghostcast assemble`: the cut re-fits without a re-shoot. `lint` warns when a line is so short
+  that the actions would play at 2× or more.
 - **script**: `scenes/x.mjs`, a code scene for a beat the storyboard can't express
   (see `docs/scene-api.md`).
 - **cap**: comes from the brief. A storyboard may set a lower one, never a higher one.

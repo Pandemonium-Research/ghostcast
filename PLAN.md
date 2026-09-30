@@ -16,7 +16,7 @@ as work lands.
 | 2 | [Isolation](#stage-2--isolation) | 1 | Done: CI on Windows, macOS and Linux |
 | 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Done: first clip in 29 to 46 s on each OS |
 | 4 | [Plan](#stage-4--plan) | 2 | Done: a fresh agent reached an approved, rehearsed storyboard from SKILL.md alone |
-| 5 | [Direction](#stage-5--direction) | 4 | Not started |
+| 5 | [Direction](#stage-5--direction) | 4 | In progress: fitting and camera done; the editor beat awaits the VS Code license |
 | 6 | [Checks](#stage-6--checks) | 4, 5 | Not started |
 | 7 | [Voice](#stage-7--voice) | 1, 4 | Not started |
 | 8 | [Delivery](#stage-8--delivery) | 1, 7 | Not started |
@@ -365,6 +365,46 @@ Done when:
 
 **Goal:** no sleeps, zoom calls or timestamps in a storyboard, and a camera nobody wants to turn
 off.
+
+Progress:
+
+- **Fitting in post** (src/post/fit.mjs): the runtime marks each beat's holds; post fits the beat
+  to the longer of its line and a minimum. Still stretches are cut first, from their middle,
+  keeping the show target's reading time in the last hold; then moving stretches play faster,
+  tagged from 1.5×; a beat shorter than its line holds its still frame longer. Each beat renders
+  as constant-speed pieces through the per-beat renderer and cache. Every cut is checked: the
+  frames either side, within the camera's view, must match (SSIM ≥ 0.995), or the stretch is
+  treated as moving.
+- **The camera** decides during capture: it frames only `show` (or `camera: <target>`), keeps a
+  framing into the next beat, eases back to wide only before actions it would hide, releases a
+  framing between beats before its page is replaced, and frames a terminal's prompt line while
+  a command is typed (the ease happens between beats, off camera). `camera: wide` and
+  `camera: follow` override it. In post, moves that barely zoom are dropped, an unfocus followed
+  by a focus becomes one move, each framing holds a minimum, and moves per minute are capped.
+- **The Skilldex story as a storyboard** (a scratch copy of the skill; the registry is the public
+  site): no sleeps, zooms or timestamps. The registry and validate beats shoot and fit to their
+  lines (16.8 s → 7.0 s and 20.5 s → 9.0 s of capture, nearly all by cutting still time).
+  Shortening both lines to one short sentence re-fits the cut with `cut` + `assemble`, no re-shoot
+  (the moves then play at 3.4× and 4×, tagged); across every cut the camera's view moves 0 px and
+  the frames either side have SSIM 1.000. Restoring the lines re-used every rendered piece.
+- **Side by side** with the hand-directed original (recovered from the bake-off's scene scripts
+  and re-shot): [the registry beat](docs/direction/registry-side-by-side.jpg) frames the same
+  search and first result, at 7.0 s against the original's 9.9 s of hand-set sleeps; [the
+  validate beat](docs/direction/validate-storyboard.jpg) types on a framed prompt and then frames
+  the score, where the original opened on a mostly empty terminal. The original still has two
+  things the storyboard lacks: a highlight ring on the result, and captions. Captions come with
+  stage 8; a highlight on `show` is a follow-up.
+- **Found and fixed while filming:** a web framing carried into a terminal beat, which opened on
+  an empty corner of its page; typing in small text on an empty terminal; and a lint that could
+  not tell a line too short for its actions (it now estimates the playback speed and warns from
+  2×).
+- **Left:** the editor beat (SKILL.md in VS Code in the browser), which needs the VS Code Server
+  license accepted for this project.
+
+Decided (defaults in project.json `direction`, to tune in stage 6): reading 3 words a second plus
+0.5 s; minimum hold 1.5 s; minimum beat 2 s; 12 moves a minute; a move must zoom at least 1.2×;
+speed-ups capped at 12×; capture holds 1.5 times the longest need plus 1 s; a cut needs SSIM
+0.995 either side.
 
 Build:
 
