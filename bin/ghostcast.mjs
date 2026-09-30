@@ -162,9 +162,13 @@ async function announceReady(port, token, server) {
 // reach it only at machine scope. The project's settings are written there, with a terminal
 // profile that starts bash on the project's clean rc file.
 function writeMachineSettings(dataDir) {
-  const own = path.join(projectDir, 'vscode', 'settings.json');
-  const settings = fs.existsSync(own) ? JSON.parse(fs.readFileSync(own, 'utf8')) : {};
-  const rc = path.join(projectDir, 'vscode', 'shell.bashrc').replace(/\\/g, '/');
+  // A project's own vscode/ files win; a studio folder has none, so the package's are used: the
+  // quiet editor layout, and the clean bash whose "$" prompt the helpers wait for.
+  const pick = (name) => [path.join(projectDir, 'vscode', name), path.join(PKG, 'templates', 'project', 'vscode', name)]
+    .find((file) => fs.existsSync(file));
+  const own = pick('settings.json');
+  const settings = own ? JSON.parse(fs.readFileSync(own, 'utf8')) : {};
+  const rc = (pick('shell.bashrc') || '').replace(/\\/g, '/');
   if (fs.existsSync(rc)) {
     const key = { win32: 'windows', darwin: 'osx' }[process.platform] || 'linux';
     const bash = process.platform === 'win32' ? gitBash() : '/bin/bash';
@@ -312,6 +316,8 @@ const commands = {
     }
     if (!which('code')) die('no `code` command on PATH');
     const v = path.join(projectDir, 'vscode');
+    // The sample project ships vscode/; a studio folder gets it on first use (it is git-ignored).
+    fs.mkdirSync(v, { recursive: true });
     const token = path.join(v, 'token');
     if (!fs.existsSync(token)) fs.writeFileSync(token, crypto.randomBytes(16).toString('hex'));
     const serverData = path.join(v, 'server-data');

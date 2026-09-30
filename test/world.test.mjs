@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -239,4 +239,24 @@ test('setup runs in bash in the copy, once, and resets return to its result', as
     assert.equal(fs.readFileSync(path.join(world.dir, 'seeded.txt'), 'utf8'), '5\n');
     assert.ok(!fs.existsSync(path.join(f.source, 'seeded.txt')), 'setup ran in the copy, not the source');
   } finally { assert.equal(await world.dispose(), true); }
+});
+
+test('a copy still in use is left for the next shoot, not a failed shoot', { skip: process.platform !== 'win32' && 'only Windows refuses to remove a folder a process runs in' }, async (t) => {
+  const f = fixture(t);
+  const world = await prepareWorld(f.project);
+  // A process running in the copy holds it, as VS Code's server does with the workspace it served.
+  const holder = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 20000)'], { cwd: world.dir, stdio: 'ignore' });
+  await new Promise((resolve) => holder.once('spawn', resolve));
+  const warnings = [], original = console.warn;
+  console.warn = (s) => warnings.push(s);
+  try { assert.equal(await world.dispose(), true); }
+  finally { console.warn = original; holder.kill(); await new Promise((resolve) => holder.once('exit', resolve)); }
+  assert.match(warnings.join('\n'), /could not remove .* yet \(still in use/);
+  assert.ok(fs.existsSync(world.dir));
+  const stale = JSON.parse(fs.readFileSync(path.join(f.cache, 'worlds', 'stale.json'), 'utf8'));
+  assert.ok(stale.includes(world.dir));
+  const next = await prepareWorld(f.project);
+  try { assert.ok(!fs.existsSync(world.dir), 'the next prepare removed the old copy'); }
+  finally { await next.dispose(); }
+  assert.ok(!fs.existsSync(path.join(f.cache, 'worlds', 'stale.json')));
 });

@@ -42,7 +42,7 @@ export async function targetVisible(h, source, timeout = 15000) {
     const started = Date.now();
     let rect;
     while (Date.now() - started < timeout) {
-      try { rect = await h.editorRect(target.value); if (rect) break; } catch {}
+      try { rect = await h.editorRect(target.value, { logical: true }); if (rect) break; } catch {}
       await h.sleep(150);
     }
     if (!rect) throw new Error(`show target ${source} never appeared`);
@@ -57,6 +57,10 @@ export async function enter(h, beat, previous) {
   // back to wide here, between beats, so the new beat does not open on an empty corner of it.
   const replaces = beat.surface !== previous?.surface || beat.surface === 'panel'
     || ((beat.surface === 'web' || beat.surface === 'terminal' || beat.surface === 'editor') && beat.open !== undefined);
+  if (h.storyboardMark) {
+    await h.unmark();
+    h.storyboardMark = false;
+  }
   if (h.storyboardFrame && replaces) {
     h.unfocus();
     h.storyboardFrame = null;
@@ -167,9 +171,25 @@ async function actionsInside(h, actions, frame) {
   return true;
 }
 
+// How much framing this rect would magnify the picture, computed as post-production does.
+function zoomGain(h, r) {
+  const { width, height, dpr } = h.config.viewport, srcW = width * dpr, srcH = height * dpr;
+  const fill = h.config.zoom?.fill ?? 0.62, maxZoom = h.config.zoom?.max ?? Math.max(1.5, dpr);
+  return srcW / Math.min(srcW, Math.max(r.w * dpr / fill, r.h * dpr / fill * srcW / srcH, srcW / maxZoom));
+}
+
 async function frame(h, target) {
   const next = await h.rect(target);
   if (h.storyboardFrame && overlap(h.storyboardFrame, next) > 0.8) return h.storyboardFrame;
+  // A target nearly as wide as the page gains nothing from a zoom (post drops such a move), so it
+  // is highlighted instead, on a wide shot. The highlight goes between beats.
+  if (h.config.viewport && zoomGain(h, next) < (h.config.direction?.minZoomGain ?? 1.2)) {
+    if (h.storyboardFrame) { h.unfocus(); h.storyboardFrame = null; await h.sleep(800); }
+    await h.mark(next, '#f59e0b', { pad: 6, glow: true });
+    h.storyboardMark = true;
+    await h.sleep(400);
+    return null;
+  }
   h.storyboardFrame = await h.focus(target);
   await h.sleep(800);
   return h.storyboardFrame;
@@ -259,7 +279,10 @@ export async function perform(h, beat, code = {}) {
   }
   if (beat.camera !== 'wide') {
     const target = beat.camera && beat.camera !== 'follow' ? await targetVisible(h, beat.camera) : found;
-    if (target) await frame(h, target.element || target.rect);
+    if (target) {
+      const framed = await frame(h, target.element || target.rect);
+      if (metric) metric.focused = !!framed;
+    }
     else if (run) {
       // Nothing to show: the command's output needs the whole terminal.
       h.unfocus();

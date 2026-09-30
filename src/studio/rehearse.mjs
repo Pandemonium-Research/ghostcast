@@ -81,7 +81,10 @@ export async function rehearse(project, { ids = [], runs = 3, headed = false } =
       }
     }
   } catch (error) { fatal = oneLine(error); }
-  finally { if (world) untouched = await world.dispose(); }
+  finally {
+    // The report is written however cleanup goes: a rehearsal's results are the point of it.
+    if (world) { try { untouched = await world.dispose(); } catch (error) { fatal ||= oneLine(error); } }
+  }
   // A beat that passed every time it ran, but not in every run because an earlier beat stopped one,
   // is unconfirmed rather than flaky: the fault is upstream.
   for (const entry of entries) {

@@ -212,7 +212,9 @@
           .sort((a, b) => { const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); return p.top - q.top || p.left - q.left; });
       },
       // Box around the text of the first visible line containing `match`, plus the next `rows - 1`.
-      rect(match, { editor = 0, rows = 1, pad = 6 } = {}) {
+      // With `logical`, rows count file lines rather than screen lines: a long line wrapped over
+      // several screen lines is taken whole (its continuations have no number in the gutter).
+      rect(match, { editor = 0, rows = 1, pad = 6, logical = false } = {}) {
         const ed = R.editor.list()[editor];
         if (!ed) throw new Error('rec: no editor ' + editor);
         const box = ed.getBoundingClientRect();
@@ -221,7 +223,16 @@
           .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
         const i = lines.findIndex((l) => l.textContent.replace(NBSP, ' ').includes(match));
         if (i < 0) throw new Error('rec: editor line not found: ' + match);
-        return R.union(lines.slice(i, i + rows).map(textBox).filter(Boolean), pad);
+        let end = i + rows;
+        if (logical) {
+          const numbers = [...ed.querySelectorAll('.margin-view-overlays .line-numbers')];
+          const numbered = (l) => numbers.some((n) => Math.abs(n.getBoundingClientRect().top - l.getBoundingClientRect().top) < 2
+            && n.textContent.trim() !== '');
+          end = i;
+          for (let taken = 0; end < lines.length && (taken < rows || !numbered(lines[end])); end++)
+            if (numbered(lines[end])) taken++;
+        }
+        return R.union(lines.slice(i, end).map(textBox).filter(Boolean), pad);
       },
     },
 

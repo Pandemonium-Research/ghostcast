@@ -47,7 +47,26 @@ function safeRelative(rel) {
 }
 function remove(file) {
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) fs.unlinkSync(file);
-  else fs.rmSync(file, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  else fs.rmSync(file, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+}
+// On Windows a folder still open elsewhere cannot be removed: VS Code keeps the workspace it
+// served open for a while after the page closes. Cleanup never fails a shoot; what cannot be
+// removed now is listed, and the next prepareWorld removes it.
+const staleFile = () => path.join(worldsDir(), 'stale.json');
+const readStale = () => { try { return JSON.parse(fs.readFileSync(staleFile(), 'utf8')); } catch { return []; } };
+function writeStale(list) {
+  if (list.length) { fs.mkdirSync(worldsDir(), { recursive: true }); fs.writeFileSync(staleFile(), JSON.stringify(list)); }
+  else fs.rmSync(staleFile(), { force: true });
+}
+function discard(files) {
+  const left = files.filter((file) => { try { remove(file); return false; } catch { return true; } });
+  if (!left.length) return;
+  writeStale([...new Set([...readStale(), ...left])]);
+  console.warn(`could not remove ${left.join(', ')} yet (still in use, for example by VS Code); the next shoot removes it`);
+}
+function sweep() {
+  const ours = (file) => file.split(/[\\/]/).some((part) => part === 'worlds' || part === 'world-profiles');
+  writeStale(readStale().filter((file) => { if (!ours(file)) return false; try { remove(file); return false; } catch { return true; } }));
 }
 function copyEntry(src, dst, exclude) {
   fs.mkdirSync(path.dirname(dst), { recursive: true });
@@ -255,6 +274,7 @@ export function openWorld(dir) {
 export async function prepareWorld(project, { keep = false } = {}) {
   const cfg = project.config.world;
   if (!cfg) return null;
+  sweep();
   if (!cfg.source) throw new Error('world.source is required');
   const projectRoot = fs.realpathSync(project.root);
   const source = fs.realpathSync(path.resolve(project.root, cfg.source));
@@ -300,7 +320,7 @@ export async function prepareWorld(project, { keep = false } = {}) {
       return result.ok;
     } finally {
       for (const lock of locks) remove(lock);
-      if (!keep) { remove(dir); remove(`${dir}.snapshot`); remove(`${dir}.json`); remove(profile); }
+      if (!keep) discard([dir, `${dir}.snapshot`, `${dir}.json`, profile]);
       else console.log(`world kept: ${dir}`);
     }
   })();
@@ -367,7 +387,7 @@ export async function prepareWorld(project, { keep = false } = {}) {
     try { if (!checked) checkUntouched(source, before, dir); }
     finally {
       for (const lock of locks) remove(lock);
-      if (!keep) { remove(dir); remove(`${dir}.snapshot`); remove(`${dir}.json`); remove(profile); }
+      if (!keep) discard([dir, `${dir}.snapshot`, `${dir}.json`, profile]);
     }
     throw e;
   }
