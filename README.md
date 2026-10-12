@@ -1,8 +1,6 @@
-<h1 align="center">ghostcast</h1>
-
-<p align="center">
-  <b>Screencasts of real software, filmed in the background while your coding agent directs.</b>
-</p>
+<h1 align="center">
+  <img src="docs/media/banner.png" width="830" alt="ghostcast: screencasts with nobody at the keyboard. A ghost types, clicks and scrolls in an off-screen browser while your agent directs.">
+</h1>
 
 <p align="center">
   <a href="https://github.com/Sampriti2803/ghostcast/actions/workflows/ci.yml"><img src="https://github.com/Sampriti2803/ghostcast/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
