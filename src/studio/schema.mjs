@@ -146,7 +146,7 @@ export function validateProduct(source) {
   return problems;
 }
 
-const beatKeys = ['id', 'surface', 'claim', 'open', 'do', 'show', 'say', 'panel', 'camera', 'seconds', 'script'];
+const beatKeys = ['id', 'surface', 'claim', 'open', 'do', 'show', 'say', 'panel', 'camera', 'seconds', 'script', 'caption', 'transition'];
 const verbs = ['click', 'fill', 'press', 'run', 'wait', 'code'];
 const target = (value) => { try { parseTarget(value); return true; } catch { return false; } };
 
@@ -155,10 +155,11 @@ export function validateStoryboard(source, brief = {}) {
   const parsed = parseYaml(source, 'storyboard.yaml');
   const c = checker('storyboard.yaml', parsed);
   const data = parsed.data;
-  if (!c.known(data, ['video', 'weight', 'type', 'cap', 'beats'])) return c.done();
+  if (!c.known(data, ['video', 'weight', 'type', 'cap', 'beats', 'transition'])) return c.done();
   if (!text(data.video) || !/^[a-z][a-z0-9_-]*$/.test(data.video)) c.add(['video'], 'use a video slug starting with a letter');
   c.enumValue(data.weight ?? brief.weight, ['quick', 'standard', 'production'], ['weight']);
   c.enumValue(data.type ?? brief.type, ['launch', 'how-to', 'feature', 'receipt'], ['type']);
+  c.enumValue(data.transition, ['cut', 'fade'], ['transition'], true);
   const cap = data.cap ?? brief.cap;
   if (!seconds(cap) || cap < 10 || cap > 600) c.add(['cap'], 'set a cap from 10 to 600 seconds');
   if (!list(data.beats) || !data.beats.length) { c.add(['beats'], 'add at least one beat'); return c.done(); }
@@ -171,6 +172,9 @@ export function validateStoryboard(source, brief = {}) {
     ids.add(beat.id);
     c.enumValue(beat.surface, ['web', 'terminal', 'editor', 'panel'], [...root, 'surface']);
     for (const key of ['claim', 'open', 'say', 'camera']) if (beat[key] !== undefined && !text(beat[key])) c.add([...root, key], 'use non-empty text');
+    c.enumValue(beat.transition, ['cut', 'fade'], [...root, 'transition'], true);
+    if (beat.caption !== undefined && (!text(beat.caption) || /[\r\n]/.test(beat.caption)))
+      c.add([...root, 'caption'], 'use non-empty text on one line');
     if (beat.seconds !== undefined && !seconds(beat.seconds)) c.add([...root, 'seconds'], 'set non-negative seconds');
     if (beat.show !== undefined && !target(beat.show)) c.add([...root, 'show'], 'use text "…", row "…", line "…", role <role> "…", label "…", or css <selector>');
     if (beat.camera !== undefined && beat.camera !== 'wide' && beat.camera !== 'follow' && !target(beat.camera))
@@ -245,10 +249,12 @@ export function validateWorld(source) {
 export function validateAudio(source) {
   const parsed = parseYaml(source, 'audio.yaml');
   const c = checker('audio.yaml', parsed), audio = parsed.data;
-  if (!c.known(audio, ['provider', 'voice', 'dir'])) return c.done();
+  if (!c.known(audio, ['provider', 'voice', 'dir', 'model', 'speed'])) return c.done();
   c.enumValue(audio.provider, ['kokoro', 'elevenlabs', 'clips', 'none'], ['provider']);
   if (['kokoro', 'elevenlabs'].includes(audio.provider)) c.required(audio.voice, ['voice'], 'a voice name');
   else if (audio.voice !== undefined && !text(audio.voice)) c.add(['voice'], 'use a voice name');
+  if (audio.model !== undefined && !text(audio.model)) c.add(['model'], 'use a model name');
+  if (audio.speed !== undefined && !(Number.isFinite(audio.speed) && audio.speed > 0)) c.add(['speed'], 'use a positive number, 1 for normal speed');
   if (audio.provider === 'clips') c.required(audio.dir, ['dir'], 'a clips directory');
   else if (audio.dir !== undefined && !text(audio.dir)) c.add(['dir'], 'use a clips directory');
   c.scan(audio);

@@ -6,7 +6,7 @@ import { loadProject } from '../project.mjs';
 import { beat_plan, windows, box_at, segments } from '../post/logic.mjs';
 import { fitTargets, directCamera, motionIntervals, readingSeconds } from '../post/fit.mjs';
 import { place } from '../post/voice.mjs';
-import { probeSize } from '../post/render.mjs';
+import { probeSize, VERSION } from '../post/render.mjs';
 import { parseYaml, readBrief } from '../studio/schema.mjs';
 import { KNOWN_TOKEN, LONG_RUN, randomToken, words } from '../studio/lint.mjs';
 
@@ -25,7 +25,7 @@ function pillBounds(c, cap) {
   const size = Math.round((style.size ?? Math.round(34 * height / 1080)) * (cap.pos === 'corner' ? .88 : 1));
   const font = style.font ? path.resolve(c.root, style.font) : captionFonts.find((p) => fs.existsSync(p));
   const fontBytes = font ? fs.readFileSync(font) : null;
-  const key = sha(JSON.stringify({ text: cap.text, pos: cap.pos, style, size, width, height, fontHash: fontBytes ? sha(fontBytes) : null, version: 'perspective-beats-9' }));
+  const key = sha(JSON.stringify({ text: cap.text, pos: cap.pos, style, size, width, height, fontHash: fontBytes ? sha(fontBytes) : null, version: VERSION }));
   if (!pillCache.has(key)) {
     const file = path.join(c.root, 'cache', 'pills', `${key}.png`);
     let bounds = null;
@@ -42,10 +42,13 @@ function pillBounds(c, cap) {
     pillCache.set(key, bounds);
   }
   const cached = pillCache.get(key);
-  if (cached) return cached;
+  if (cached) return { x: cached.x * 960 / width, y: cached.y * 540 / height, w: cached.w * 960 / width, h: cached.h * 540 / height };
   const scaleX = 960 / width, scaleY = 540 / height;
-  const pillW = Math.min(960, (cap.text.length * size * .58 + 2 * size) * scaleX);
-  const pillH = Math.min(540, size * 2 * scaleY), margin = .05 * height * scaleY;
+  const estimatedWidth = cap.text.length * size * .58 + 2 * size;
+  const pillW = Math.min(cap.pos === 'corner' ? 960 : 960 * .7, estimatedWidth * scaleX);
+  const lines = cap.pos !== 'corner' && estimatedWidth > width * .7 ? 2 : 1;
+  const pillH = Math.min(540, (cap.pos === 'corner' ? size * 2 : Math.ceil(size * 1.25) * lines + 2 * Math.round(size * .6)) * scaleY);
+  const margin = (cap.pos === 'corner' ? .05 : .06) * height * scaleY;
   return { x: cap.pos === 'corner' ? 960 - pillW - margin * .75 : (960 - pillW) / 2,
     y: cap.pos === 'corner' ? margin * .75 : cap.pos === 'top' ? margin : 540 - margin - pillH, w: pillW, h: pillH };
 }
@@ -67,7 +70,7 @@ function context(root, take) {
   const [srcW, srcH] = first && fs.existsSync(first) ? probeSize(first) : [width * dpr, height * dpr];
   const vp = log.find((e) => e[1] === 'viewport')?.[2];
   const scale = vp ? srcW / vp.w : dpr;
-  const plan = frames.length ? beat_plan(log, frames, cfg, srcW, srcH, { targets, readings }) : { beats: [], keys: [], meta: { duration: 0, segments: [] } };
+  const plan = frames.length ? beat_plan(log, frames, cfg, srcW, srcH, { targets, readings, item }) : { beats: [], keys: [], meta: { duration: 0, segments: [] } };
   return { root, cfg, take, raw, log, frames, item, width, height, dpr: scale, srcW, srcH, storyboard, brief, beats, isStory, plan };
 }
 
@@ -247,9 +250,11 @@ function pixels(c, problems, thresholds) {
     const toOutput = c.cfg.output.height / 540;
     const tooSmall = lines.length > 0 && lines.filter((h0) => h0 * toOutput < thresholds.minTextPx * .7).length > lines.length / 2;
     const hash = `${crop.map((v) => Math.round(v * 10) / 10).join(',')}:${data.toString('base64')}`;
-    if (hash === previousImage && previousSec !== null && s.sec - previousSec <= 1.1) s.frozenSince = freezeStart;
+    const dissolving = c.plan.beats.some((b) => b.fade && s.sec >= b.start && s.sec < b.start + b.fade.seconds);
+    if (dissolving) { previousImage = null; previousSec = null; freezeStart = null; }
+    else if (hash === previousImage && previousSec !== null && s.sec - previousSec <= 1.1) s.frozenSince = freezeStart;
     else { previousImage = hash; freezeStart = s.sec; }
-    previousImage = hash; previousSec = s.sec;
+    if (!dissolving) { previousImage = hash; previousSec = s.sec; }
     s.empty = empty; s.small = tooSmall; s.lines = lines.length; s.data = data; s.background = mode;
   }
   // Frames that cannot be read leave the pixel checks blind; say so rather than pass unchecked.

@@ -190,3 +190,30 @@ test('Chrome + ffmpeg: a recorded storyboard gets beat sheets and checkable conf
   assert.match(right.stdout, /confirmed registry/);
   assert.ok(fs.existsSync(path.join(studio, 'confirmations.json')));
 });
+
+test('pure: dissolve leaves caption length and reading checks at the same times', (t) => {
+  const root = fixture({ timeline: { items: [{ take: 'alpha', captions: [
+    { text: 'Read this caption', from: 'alpha', at: .3, until: 7.8 },
+  ] }] } });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  const plain = checks(root);
+  assert.ok(!plain.some((p) => p.check === 'caption-long' || p.check === 'caption-read'));
+  const file = path.join(root, 'timeline.json'), timeline = JSON.parse(fs.readFileSync(file));
+  timeline.items[0].transitions = { alpha: 'fade' };
+  fs.writeFileSync(file, JSON.stringify(timeline));
+  assert.deepEqual(checks(root), plain);
+});
+
+test('ffmpeg pixels: a dissolve is motion even when its incoming source is frozen', (t) => {
+  const root = fixture({ config: { viewport: { width: 320, height: 180, dpr: 1 },
+    output: { width: 320, height: 180, fps: 30 }, direction: { fadeSeconds: 6 } } });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  const raw = path.join(root, 'raw', 'alpha'); fs.mkdirSync(path.join(raw, 'frames'), { recursive: true });
+  const made = spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=s=320x180:d=0.1',
+    '-frames:v', '1', '-y', path.join(raw, 'frames', 'sample.jpg')], { encoding: 'utf8' });
+  assert.equal(made.status, 0, made.stderr);
+  fs.writeFileSync(path.join(raw, 'frames.json'), JSON.stringify([[0, 'sample.jpg']]));
+  assert.ok(checkTake(root, 'alpha').some((p) => p.check === 'frozen'));
+  fs.writeFileSync(path.join(root, 'timeline.json'), JSON.stringify({ items: [{ take: 'alpha', transitions: { alpha: 'fade' } }] }));
+  assert.ok(!checkTake(root, 'alpha').some((p) => p.check === 'frozen'));
+});

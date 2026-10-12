@@ -1,12 +1,13 @@
 import { test } from 'node:test';
+import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { segments, smooth, view_track, box_at, windows, speed_tag, beat_plan, captionPieces } from '../src/post/logic.mjs';
-import { runs, perspectiveExpressions } from '../src/post/render.mjs';
+import { segments, smooth, view_track, box_at, windows, speed_tag, beat_plan, captionPieces, transitionPlan } from '../src/post/logic.mjs';
+import { runs, perspectiveExpressions, beatCacheKey, cut as renderCut, assemble as renderAssemble, ffmpeg, ffmpegStderr, pill } from '../src/post/render.mjs';
 import { directCamera, fitSegment, fitTargets, motionIntervals, readingSeconds } from '../src/post/fit.mjs';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'vectors');
@@ -23,6 +24,12 @@ test('smooth vectors', () => { for (const [k, v] of cut.smooth) close(smooth(k),
 for (const c of cut.view_track) test(`view_track: ${c.name}`, () => close(view_track(c.log, ...c.src, c.dpr, cfg), c.expected));
 for (const c of cut.box_at) test(`box_at: ${c.name}`, () => { for (const [t, v] of c.samples) close(box_at(c.keys, t), v); });
 for (const c of assemble.windows) test(`windows: ${c.name}`, () => close(windows(c.item, c.meta), c.expected));
+
+test('windows: a capped caption ends with its segment or at its cap, whichever is first', () => {
+  const meta = { duration: 12, segments: [{ segment: 'long', start: 0, end: 10 }, { segment: 'short', start: 10, end: 12 }] };
+  const item = { take: 't', captions: [{ text: 'Long', from: 'long', at: .3, until: 'end', max: 7.5 }, { text: 'Short', from: 'short', at: .3, until: 'end', max: 7.5 }] };
+  close(windows(item, meta), [['Long', .3, 7.8, 'bottom'], ['Short', 10.3, 12, 'bottom']]);
+});
 for (const c of assemble.windows_errors) test(`windows error: ${c.name}`, () => assert.throws(() => windows(c.item, c.meta)));
 test('speed_tag vectors', () => { for (const [s, tag] of assemble.speed_tag) assert.equal(speed_tag(s), tag); });
 test('tick count rounds half frames to even as Python does', () => {
@@ -367,4 +374,203 @@ test('reading time grows with the target text and is capped: a paragraph is glan
   assert.equal(readingSeconds('Format conformance score: 100/100'), 0.5 + 5 / 3);
   assert.equal(readingSeconds(Array(40).fill('word').join(' ')), 4);
   assert.equal(readingSeconds(Array(40).fill('word').join(' '), { direction: { readingMax: 6 } }), 6);
+});
+
+test('fades mark only the first fitted piece and identify the previous segment, item or colour', () => {
+  const beats = [
+    { segment: 'one', start: 0, end: 1 },
+    { segment: 'one', start: 1, end: 2 },
+    { segment: 'two', start: 2, end: 3 },
+    { segment: 'two', start: 3, end: 4 },
+    { segment: 'three', start: 4, end: 5 },
+  ];
+  const item = { take: 'demo', transitions: { one: 'fade', two: 'fade', three: 'cut' } };
+  const plan = transitionPlan(beats, item, { direction: { fadeSeconds: .4 }, transitions: { color: '#123456' } });
+  assert.deepEqual(plan.map((b) => b.fade), [
+    { seconds: .4, from: { color: '#123456' } }, undefined,
+    { seconds: .4, from: { piece: 1, segment: 'one' } }, undefined, undefined,
+  ]);
+  assert.deepEqual(transitionPlan(beats, item, {}, { take: 'previous', segment: 'last' })[0].fade,
+    { seconds: .5, from: { take: 'previous', segment: 'last' } });
+  assert.deepEqual(transitionPlan(beats, item, {})[0].fade.from, { color: '#000000' });
+  assert.deepEqual(plan.map(({ fade, ...b }) => b), beats, 'no timestamps shift');
+  assert.ok(beats.every((b) => !b.fade), 'planning does not mutate inputs');
+  assert.equal(transitionPlan([{ segment: 'one', start: 0, end: .2 }], item, {})[0].fade.seconds, .2);
+  const log = [[200, '+one'], [1000, 'hold', { beat: 'one' }], [9000, 'holdend'], [9650, '-one'],
+    [11000, '+two'], [12000, '-two']];
+  const fitted = beat_plan(log, [[0, 'frame.jpg']], { output: { fps: 30 } }, 320, 180,
+    { targets: { one: 4 }, item });
+  assert.ok(fitted.beats.filter((b) => b.segment === 'one').length > 1);
+  assert.deepEqual(fitted.beats.filter((b) => b.fade).map((b) => b.segment), ['one', 'two']);
+});
+
+test('storyboard caption windows keep the segment offsets and cap even when transitions fade', () => {
+  const meta = { duration: 33, segments: [{ segment: 'intro', start: 0, end: 3 }, { segment: 'long', start: 3, end: 33 }] };
+  const item = { take: 'storyboard', transitions: { intro: 'fade', long: 'fade' }, captions: [
+    { text: 'Begin here', from: 'intro', at: .3, until: 3 },
+    { text: 'See the result', from: 'long', at: .3, until: 7.8 },
+  ] };
+  close(windows(item, meta), [['Begin here', .3, 3, 'bottom'], ['See the result', 3.3, 10.8, 'bottom']]);
+  assert.deepEqual(captionPieces(windows(item, meta), { start: 3, end: 4 }),
+    [{ text: 'See the result', pos: 'bottom', a: 3.3 - 3, b: 1, fadeIn: true, fadeOut: false }]);
+});
+
+test('only the faded first piece cache key depends on the previous output frame', () => {
+  const item = { transitions: { two: 'fade' } };
+  const beats = transitionPlan([
+    { segment: 'one', a: 0, b: 1, start: 0, end: 1, ticks: [] },
+    { segment: 'two', a: 1, b: 2, start: 1, end: 2, ticks: [] },
+    { segment: 'two', a: 2, b: 3, start: 2, end: 3, ticks: [] },
+  ], item, {});
+  const key = (beat, previousFrameHash) => beatCacheKey({ take: 'demo', cfg: { output: { width: 320, height: 180, fps: 30 } },
+    beat, keys: [], logEvents: [], pieces: [], source: [], captionImages: [], previousFrameHash });
+  assert.deepEqual(beats.map((b) => key(b, 'old') !== key(b, 'changed')), [false, true, false]);
+  assert.notEqual(key(beats[1], 'old'), key({ ...beats[1], fade: { ...beats[1].fade, seconds: .3 } }, 'old'));
+  assert.notEqual(key(beats[1], 'old'), key({ ...beats[1], fade: undefined }, 'old'));
+});
+
+test('Chrome + ffmpeg: dissolve matches the outgoing output frame, resumes B and preserves duration', { timeout: 180000 }, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostcast-fade-'));
+  try {
+    const raw = path.join(root, 'raw', 'demo'), images = path.join(raw, 'frames');
+    fs.mkdirSync(images, { recursive: true });
+    for (const [name, source] of [['first', 'testsrc2=s=320x180:d=0.1'], ['second', 'smptebars=s=320x180']])
+      await ffmpeg(['-f', 'lavfi', '-i', source, '-frames:v', '1', '-y', path.join(images, name + '.jpg')]);
+    const project = { name: 'fade', viewport: { width: 320, height: 180, dpr: 1 },
+      output: { width: 320, height: 180, fps: 30 }, captions: { size: 18 }, direction: { fadeSeconds: .5 } };
+    fs.writeFileSync(path.join(root, 'project.json'), JSON.stringify(project));
+    const log = [[200, '+first@2x'], [600, 'focus', { x: 40, y: 20, w: 80, h: 45 }], [3850, '-first@2x'],
+      [5200, '+second'], [7200, '-second']];
+    const frames = [[0, 'first.jpg'], [4500, 'second.jpg'], [5500, 'first.jpg']];
+    fs.writeFileSync(path.join(raw, 'log.json'), JSON.stringify(log));
+    fs.writeFileSync(path.join(raw, 'frames.json'), JSON.stringify(frames));
+    const timeline = { items: [{ take: 'demo', transitions: {} }] };
+    const write = () => fs.writeFileSync(path.join(root, 'timeline.json'), JSON.stringify(timeline));
+    write();
+    const plain = await renderCut(root, 'demo');
+    timeline.items[0].transitions = { second: 'fade' }; write();
+    const faded = await renderCut(root, 'demo');
+    assert.deepEqual(faded.meta, plain.meta);
+    assert.equal(faded.paths[0], plain.paths[0]);
+    assert.notEqual(faded.paths[1], plain.paths[1]);
+    const capture = async (clip, frame, name) => {
+      const dest = path.join(root, name + '.png');
+      await ffmpeg(['-i', clip, '-vf', `select=eq(n\\,${frame})`, '-frames:v', '1', '-y', dest]);
+      return dest;
+    };
+    const compare = async (a, b) => {
+      const report = await ffmpegStderr(['-i', a, '-i', b, '-filter_complex', '[0:v][1:v]ssim[out]',
+        '-map', '[out]', '-frames:v', '1', '-f', 'null', '-']);
+      const score = Number(/All:\s*([\d.]+)/.exec(report)?.[1]);
+      assert.ok(Number.isFinite(score), report); return score;
+    };
+    const firstFrames = Math.round((faded.meta.segments[0].end - faded.meta.segments[0].start) * 30);
+    const lastA = await capture(faded.paths[0], firstFrames - 1, 'last-a');
+    const firstB = await capture(faded.paths[1], 0, 'first-b');
+    const initialSsim = await compare(lastA, firstB);
+    assert.ok(initialSsim > .95, `B starts with A including its perspective and speed tag (SSIM ${initialSsim})`);
+    const after = Math.round((project.direction.fadeSeconds + .1) * 30);
+    assert.ok(await compare(await capture(faded.paths[1], after, 'faded-after'),
+      await capture(plain.paths[1], after, 'plain-after')) > .95);
+    const duration = () => {
+      const probe = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=nb_frames:format=duration', '-of', 'json',
+        path.join(root, 'clips', 'demo.mp4')], { encoding: 'utf8' });
+      assert.equal(probe.status, 0, probe.stderr); return JSON.parse(probe.stdout);
+    };
+    const joined = duration();
+    assert.equal(Number(joined.streams[0].nb_frames), Math.round(faded.meta.duration * 30));
+    assert.ok(Math.abs(Number(joined.format.duration) - plain.meta.duration) <= 1 / 30);
+    await renderAssemble(root);
+    const assembled = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=nb_frames', '-of', 'csv=p=0',
+      path.join(root, 'out', 'fade-silent.mp4')], { encoding: 'utf8' });
+    assert.equal(assembled.status, 0, assembled.stderr);
+    assert.equal(Number(assembled.stdout.trim()), Number(joined.streams[0].nb_frames));
+  } finally { fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+});
+
+test('Chrome + ffmpeg: lower thirds wrap at fixed size, mirror at the top and keep the corner tag', { timeout: 120000 }, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostcast-caption-look-'));
+  let browser;
+  try {
+    browser = await chromium.launch({ channel: 'chrome', headless: true });
+    const project = { output: { width: 1920, height: 1080 }, captions: { size: 34, accent: '#7c6cf6' } };
+    const text = 'A clear caption explains the result and helps every viewer follow the software demonstration on screen';
+    const assets = {};
+    for (const pos of ['bottom', 'top', 'corner']) {
+      const file = await pill(root, project, pos === 'corner' ? '2×' : text, pos, async () => browser);
+      const read = spawnSync('ffmpeg', ['-v', 'error', '-i', file, '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'],
+        { maxBuffer: 1920 * 1080 * 4 + 1024 });
+      assert.equal(read.status, 0, read.stderr?.toString());
+      const data = read.stdout, rows = new Set();
+      let left = 1920, right = 0, top = 1080, bottom = 0, white = 0, accent = 0;
+      for (let y = 0; y < 1080; y++) for (let x = 0; x < 1920; x++) {
+        const i = (y * 1920 + x) * 4;
+        if (!data[i + 3]) continue;
+        left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+        if (data[i] > 245 && data[i + 1] > 245 && data[i + 2] > 245) { white++; rows.add(y); }
+        if (data[i] === 124 && data[i + 1] === 108 && data[i + 2] === 246) accent++;
+      }
+      assert.ok(white > 0);
+      assets[pos] = { left, right, top, bottom, rows, accent };
+      if (pos !== 'corner') {
+        assert.ok(right - left + 1 <= Math.floor(1920 * .7));
+        assert.ok(accent > 0);
+        const bands = [...rows].sort((a, b) => a - b).filter((row, i, all) => !i || row > all[i - 1] + 1);
+        assert.equal(bands.length, 2, 'text wraps to two lines at the configured font size');
+        assert.ok(bottom - top + 1 >= 2 * Math.ceil(34 * 1.25));
+        const center = ((top + bottom) >> 1) * 1920 + ((left + right) >> 1);
+        assert.ok(data[center * 4 + 3] >= 225, 'background is slightly translucent');
+      } else assert.equal(accent, 0);
+    }
+    assert.equal(assets.top.top, Math.round(1080 * .06));
+    assert.equal(1080 - assets.bottom.bottom - 1, Math.round(1080 * .06));
+    assert.equal(assets.top.bottom - assets.top.top, assets.bottom.bottom - assets.bottom.top);
+    assert.equal(assets.top.left, assets.bottom.left);
+    assert.equal(assets.corner.top, Math.round(Math.round(1080 * .05) * .75));
+  } finally { await browser?.close(); fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+});
+
+test('ffmpeg: first colour fades and cross-item fades reuse only the changed dependent piece', { timeout: 120000 }, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostcast-cross-fade-'));
+  const previousJobs = process.env.GHOSTCAST_JOBS; process.env.GHOSTCAST_JOBS = '4';
+  try {
+    const project = { name: 'cross', viewport: { width: 320, height: 180, dpr: 1 },
+      output: { width: 320, height: 180, fps: 30 }, transitions: { color: '#123456' } };
+    fs.writeFileSync(path.join(root, 'project.json'), JSON.stringify(project));
+    fs.writeFileSync(path.join(root, 'product.md'), '# Synthetic product\n');
+    fs.writeFileSync(path.join(root, 'storyboard.yaml'), 'beats:\n  - id: held\n    say: One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen\n');
+    for (const take of ['prior', 'storyboard']) {
+      const raw = path.join(root, 'raw', take); fs.mkdirSync(path.join(raw, 'frames'), { recursive: true });
+      await ffmpeg(['-f', 'lavfi', '-i', take === 'prior' ? 'testsrc2=s=320x180:d=0.1' : 'smptebars=s=320x180',
+        '-frames:v', '1', '-y', path.join(raw, 'frames', 'frame.jpg')]);
+      fs.writeFileSync(path.join(raw, 'frames.json'), JSON.stringify([[0, 'frame.jpg']]));
+      const log = take === 'prior' ? [[200, '+previous'], [1850, '-previous']]
+        : [[200, '+held'], [1000, 'hold', { beat: 'held' }], [9000, 'holdend'], [9650, '-held']];
+      fs.writeFileSync(path.join(raw, 'log.json'), JSON.stringify(log));
+    }
+    fs.writeFileSync(path.join(root, 'timeline.json'), JSON.stringify({ items: [
+      { take: 'prior', transitions: { previous: 'fade' } },
+      { take: 'storyboard', transitions: { held: 'fade' } },
+    ] }));
+    const faded = await renderCut(root, 'storyboard');
+    assert.ok(fs.existsSync(path.join(root, 'clips', 'prior.mp4')), 'missing predecessor is rendered first');
+    assert.ok(faded.paths.length > 1, 'the incoming segment has fitted pieces');
+    const before = [...faded.paths];
+    const first = spawnSync('ffmpeg', ['-v', 'error', '-i', path.join(root, 'clips', 'prior.mp4'),
+      '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1'], { maxBuffer: 320 * 180 * 3 + 1024 });
+    assert.equal(first.status, 0, first.stderr?.toString());
+    assert.ok(Math.abs(first.stdout[0] - 18) < 8 && Math.abs(first.stdout[1] - 52) < 8 && Math.abs(first.stdout[2] - 86) < 8,
+      'the first beat fades from the configured solid colour');
+    await ffmpeg(['-f', 'lavfi', '-i', 'color=c=red:s=320x180:d=0.1', '-frames:v', '1', '-y',
+      path.join(root, 'raw', 'prior', 'frames', 'frame.jpg')]);
+    await renderCut(root, 'prior');
+    await renderAssemble(root);
+    const after = JSON.parse(fs.readFileSync(path.join(root, 'clips', 'storyboard.beats.json'))).map((p) => path.resolve(root, p));
+    assert.notEqual(after[0], before[0]);
+    assert.deepEqual(after.slice(1), before.slice(1), 'only the faded first piece depends on its predecessor');
+    assert.deepEqual((await renderCut(root, 'storyboard')).paths, after, 'warm cache reuses every piece');
+  } finally {
+    if (previousJobs === undefined) delete process.env.GHOSTCAST_JOBS; else process.env.GHOSTCAST_JOBS = previousJobs;
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
 });

@@ -4,11 +4,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
-import { beat_plan, windows, captionPieces, box_at, segments } from './logic.mjs';
+import { beat_plan, transitionPlan, windows, captionPieces, box_at, segments } from './logic.mjs';
 import { directCamera, fitTargets, motionIntervals, direction } from './fit.mjs';
 import { loadProject } from '../project.mjs';
 
-const VERSION = 'perspective-beats-9';
+export const VERSION = 'perspective-beats-10';
 const ENCODER = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-tune', 'animation', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
 const FFMPEG_BUILD = spawnSync('ffprobe', ['-version'], { encoding: 'utf8' }).stdout?.split(/\r?\n/)[0] ?? 'unknown';
 // A beat's filter graph can pass Windows' 32 767-character command line, so it goes in a file.
@@ -23,10 +23,12 @@ const writeJson = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2) + '\n
 const sha = (v) => crypto.createHash('sha256').update(v).digest('hex');
 const hashFile = (p) => sha(fs.readFileSync(p));
 const tmpName = (p) => `${p}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp.mp4`;
-function captionSignature(root, cfg, caps) {
+function captionSignature(root, cfg, caps, item = {}, previousClip = null) {
   const font = !caps.length ? null : cfg.captions?.font ? path.resolve(root, cfg.captions.font) : FONTS.find((p) => fs.existsSync(p));
   return sha(JSON.stringify({ caps, style: caps.length ? cfg.captions : null, font: font ? hashFile(font) : null,
-    width: cfg.output.width, height: cfg.output.height, fps: cfg.output.fps, version: VERSION }));
+    width: cfg.output.width, height: cfg.output.height, fps: cfg.output.fps, version: VERSION,
+    transitions: item.transitions ?? {}, fadeSeconds: cfg.direction?.fadeSeconds ?? .5,
+    color: cfg.transitions?.color ?? '#000000', previousClip: previousClip ? hashFile(previousClip) : null }));
 }
 
 async function runFfmpeg(args, capture) {
@@ -128,7 +130,7 @@ function sourcePts(rs, fps) {
   return `(N${offsets.length ? '+' + offsets.join('+') : ''})/(${fps}*TB)`;
 }
 
-async function pill(root, cfg, text, pos, getBrowser) {
+export async function pill(root, cfg, text, pos, getBrowser) {
   const style = cfg.captions ?? {}, width = cfg.output.width, height = cfg.output.height;
   const size = Math.round((style.size ?? Math.round(34 * height / 1080)) * (pos === 'corner' ? .88 : 1));
   const fontPath = style.font ? path.resolve(root, style.font) : FONTS.find((p) => fs.existsSync(p));
@@ -146,16 +148,43 @@ async function pill(root, cfg, text, pos, getBrowser) {
       const c = document.createElement('canvas'); c.width = width; c.height = height;
       const g = c.getContext('2d');
       g.font = fontData ? `${size}px GhostcastCaption` : `600 ${size}px "Segoe UI", "Arial", sans-serif`;
-      const m = g.measureText(text), px = Math.round(size), py = Math.round(size * .6);
-      const pw = Math.ceil(m.width) + 2 * px, ph = Math.ceil(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) + 2 * py;
-      const margin = Math.round(height * .05);
+      const color = (v) => typeof v === 'string' ? v : `rgba(${v[0]},${v[1]},${v[2]},${(v[3] ?? 255) / 255})`;
+      const px = Math.round(size), py = Math.round(size * .6);
+      let lines = [text];
+      const limit = Math.floor(width * .7), available = Math.max(1, limit - 2 * px);
+      if (pos !== 'corner' && g.measureText(text).width > available) {
+        const words = text.split(/\s+/);
+        let first = '';
+        while (words.length && g.measureText([first, words[0]].filter(Boolean).join(' ')).width <= available)
+          first = [first, words.shift()].filter(Boolean).join(' ');
+        if (!first) {
+          const chars = Array.from(words[0]);
+          while (chars.length && g.measureText(first + chars[0]).width <= available) first += chars.shift();
+          words[0] = chars.join('');
+        }
+        lines = [first, words.join(' ')];
+        if (g.measureText(lines[1]).width > available) {
+          const chars = Array.from(lines[1]);
+          while (chars.length && g.measureText(chars.join('') + '…').width > available) chars.pop();
+          lines[1] = chars.join('') + '…';
+        }
+      }
+      const metrics = lines.map((line) => g.measureText(line));
+      const lineHeight = Math.ceil(size * 1.25);
+      const pw = Math.min(pos === 'corner' ? width : limit, Math.ceil(Math.max(...metrics.map((m) => m.width))) + 2 * px);
+      const ph = pos === 'corner' ? Math.ceil(metrics[0].actualBoundingBoxAscent + metrics[0].actualBoundingBoxDescent) + 2 * py
+        : lineHeight * lines.length + 2 * py;
+      const margin = Math.round(height * (pos === 'corner' ? .05 : .06));
       const x = pos === 'corner' ? width - pw - Math.round(margin * .75) : Math.floor((width - pw) / 2);
       const y = pos === 'corner' ? Math.round(margin * .75) : pos === 'top' ? margin : height - ph - margin;
-      const color = (v) => `rgba(${v[0]},${v[1]},${v[2]},${(v[3] ?? 255) / 255})`;
       g.fillStyle = color(style.background ?? [24, 24, 27, 225]);
-      g.beginPath(); g.roundRect(x, y, pw, ph, ph / 2); g.fill();
-      g.fillStyle = color(style.color ?? [250, 250, 250, 255]);
-      g.fillText(text, x + px, y + py + m.actualBoundingBoxAscent);
+      g.beginPath(); g.roundRect(x, y, pw, ph, pos === 'corner' ? ph / 2 : Math.round(size * .22)); g.fill();
+      if (pos !== 'corner') {
+        g.fillStyle = color(style.accent ?? '#7c6cf6');
+        g.fillRect(x, y + size * .22, Math.max(2, Math.round(size * .12)), ph - size * .44);
+      }
+      g.fillStyle = color(style.color ?? (pos === 'corner' ? [250, 250, 250, 255] : [255, 255, 255, 255]));
+      lines.forEach((line, i) => g.fillText(line, x + px, y + py + (pos === 'corner' ? metrics[0].actualBoundingBoxAscent : size) + i * lineHeight));
       return c.toDataURL('image/png').split(',')[1];
     }, { text, pos, style, size, width, height, fontData });
     fs.writeFileSync(dest, Buffer.from(data, 'base64'));
@@ -163,17 +192,23 @@ async function pill(root, cfg, text, pos, getBrowser) {
   return dest;
 }
 
-async function renderBeat(root, take, cfg, beat, keys, logEvents, pieces, fileHashes, getPill) {
+export function beatCacheKey({ take, cfg, beat, keys, logEvents, pieces, source, captionImages, previousFrameHash = null }) {
+  const fps = cfg.output.fps;
+  return sha(JSON.stringify({ version: VERSION, take, segment: beat.segment, a: beat.a, b: beat.b,
+    speed: beat.speed, source, stamps: beat.ticks.map((t) => [t.stamp, t.sourceTime]),
+    keys: keys.filter(([t]) => t <= beat.b), logEvents, pieces, captions: pieces.length ? cfg.captions : null,
+    captionImages, fade: beat.fade ? { ...beat.fade, previousFrameHash } : null,
+    output: { width: cfg.output.width, height: cfg.output.height, fps }, encoder: ENCODER, ffmpeg: FFMPEG_BUILD }));
+}
+
+async function renderBeat(root, take, cfg, beat, keys, logEvents, pieces, fileHashes, getPill, previousFrame = null) {
   const raw = path.join(root, 'raw', take, 'frames');
   const rs = runs(beat.ticks), fps = cfg.output.fps;
   const assets = [];
   for (const c of pieces) assets.push(await getPill(c.text, c.pos));
   const source = rs.map((r) => ({ name: r.file, hash: fileHashes.get(r.file), count: r.count, box: r.box }));
-  const hash = sha(JSON.stringify({ version: VERSION, take, segment: beat.segment, a: beat.a, b: beat.b,
-    speed: beat.speed, source, stamps: beat.ticks.map((t) => [t.stamp, t.sourceTime]),
-    keys: keys.filter(([t]) => t <= beat.b), logEvents, pieces, captions: pieces.length ? cfg.captions : null,
-    captionImages: assets.map(hashFile),
-    output: { width: cfg.output.width, height: cfg.output.height, fps }, encoder: ENCODER, ffmpeg: FFMPEG_BUILD }));
+  const hash = beatCacheKey({ take, cfg, beat, keys, logEvents, pieces, source,
+    captionImages: assets.map(hashFile), previousFrameHash: previousFrame ? hashFile(previousFrame) : null });
   const dir = path.join(root, 'cache', 'beats'); fs.mkdirSync(dir, { recursive: true });
   const dest = path.join(dir, `${hash}.mp4`);
   if (fs.existsSync(dest)) { console.log(`${take} · ${beat.segment}: cache hit`); return dest; }
@@ -185,10 +220,16 @@ async function renderBeat(root, take, cfg, beat, keys, logEvents, pieces, fileHa
   const warp = perspective(rs, { ...beat, fps, srcW: keys[0][1][2], srcH: keys[0][1][3] }, keys);
   let graph = `[0:v]settb=1/${fps * 1000},setpts='${sourcePts(rs, fps)}',${warp ? `${warp},` : ''}scale=${cfg.output.width}:${cfg.output.height}:flags=lanczos,fps=${fps},format=yuv420p[base]`;
   let last = '[base]';
+  if (beat.fade) {
+    if (previousFrame) inputs.push('-stream_loop', '-1', '-i', previousFrame);
+    else inputs.push('-f', 'lavfi', '-i', `color=c=${beat.fade.from.color.replace(/^#/, '0x')}:s=${cfg.output.width}x${cfg.output.height}:r=${fps}`);
+    graph += `;[1:v]settb=1/${fps * 1000},setpts=PTS-STARTPTS,format=yuva420p,fade=out:st=0:d=${beat.fade.seconds.toFixed(6)}:alpha=1[outgoing];[base][outgoing]overlay=0:0:shortest=1[dissolved]`;
+    last = '[dissolved]';
+  }
   for (let i = 0; i < pieces.length; i++) {
     const c = pieces[i], png = assets[i];
     inputs.push('-loop', '1', '-framerate', String(fps), '-i', png);
-    let chain = `[${i + 1}:v]format=rgba`;
+    let chain = `[${i + (beat.fade ? 2 : 1)}:v]format=rgba`;
     if (c.fadeIn) chain += `,fade=in:st=${Math.max(0, c.a).toFixed(6)}:d=0.25:alpha=1`;
     if (c.fadeOut) chain += `,fade=out:st=${Math.max(c.a, c.b - .25).toFixed(6)}:d=0.25:alpha=1`;
     graph += `;${chain}[cap${i}];${last}[cap${i}]overlay=0:0:enable='between(t,${c.a.toFixed(6)},${c.b.toFixed(6)})'[v${i}]`;
@@ -213,6 +254,33 @@ async function join(paths, dest, root) {
   const tmp = tmpName(dest);
   try { await ffmpeg(['-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-movflags', '+faststart', '-y', tmp]); fs.renameSync(tmp, dest); }
   finally { for (const p of [list, tmp]) { try { fs.unlinkSync(p); } catch {} } }
+}
+
+async function previousTimelineClip(root, take) {
+  const file = path.join(root, 'timeline.json');
+  if (!fs.existsSync(file)) return null;
+  const items = readJson(file).items, index = items.findIndex((item) => item.take === take);
+  if (index < 1) return null;
+  const previous = items[index - 1].take;
+  const clip = path.join(root, 'clips', `${previous}.mp4`);
+  if (!fs.existsSync(clip)) await cut(root, previous);
+  const manifest = path.join(root, 'clips', `${previous}.beats.json`);
+  const last = fs.existsSync(manifest) ? readJson(manifest).at(-1) : null;
+  return last && fs.existsSync(path.resolve(root, last)) ? path.resolve(root, last) : clip;
+}
+
+async function lastFrame(root, clip) {
+  const dir = path.join(root, 'cache', 'frames'); fs.mkdirSync(dir, { recursive: true });
+  const dest = path.join(dir, `${hashFile(clip)}.y4m`);
+  if (fs.existsSync(dest)) return dest;
+  const tmp = `${dest}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.y4m`;
+  try {
+    // Reverse the decoded tail to select the last frame; YUV avoids an RGB chroma round trip.
+    await ffmpeg(['-sseof', '-1', '-i', clip, '-an', '-vf', 'reverse', '-frames:v', '1',
+      '-pix_fmt', 'yuv420p', '-f', 'yuv4mpegpipe', '-y', tmp]);
+    fs.renameSync(tmp, dest);
+  } finally { try { fs.unlinkSync(tmp); } catch {} }
+  return dest;
 }
 
 export async function cut(root, take) {
@@ -266,6 +334,11 @@ export async function cut(root, take) {
     console.log(`${take} · ${s.segment}: ${s.fit.natural.toFixed(1)} s → ${s.fit.output.toFixed(1)} s (${note.join(', ')})`);
   }
   const item = (fs.existsSync(path.join(root, 'timeline.json')) ? readJson(path.join(root, 'timeline.json')).items : []).find((x) => x.take === take) ?? { take };
+  const firstFade = item.transitions?.[plan.beats[0].segment] === 'fade';
+  const previousClip = firstFade ? await previousTimelineClip(root, take) : null;
+  const previous = previousClip ? { take: readJson(path.join(root, 'timeline.json')).items
+    .find((_, index, items) => items[index + 1]?.take === take)?.take } : null;
+  plan.beats = transitionPlan(plan.beats, item, cfg, previous);
   const meta = { take, ...plan.meta }, caps = windows(item, meta);
   const hashes = new Map();
   for (const b of plan.beats) for (const tick of b.ticks) if (!hashes.has(tick.file)) hashes.set(tick.file, hashFile(path.join(raw, 'frames', tick.file)));
@@ -277,19 +350,33 @@ export async function cut(root, take) {
     if (!pillJobs.has(key)) pillJobs.set(key, pill(root, cfg, text, pos, getBrowser));
     return pillJobs.get(key);
   };
-  const jobs = plan.beats.map((b) => () => renderBeat(root, take, cfg, b, plan.keys,
-    log.filter(([ms]) => ms / 1000 >= b.a && ms / 1000 <= b.b), captionPieces(caps, b), hashes, getPill));
   const maxJobs = process.env.GHOSTCAST_JOBS === undefined ? 1 : Number(process.env.GHOSTCAST_JOBS);
   if (!Number.isSafeInteger(maxJobs) || maxJobs < 1) throw new Error('GHOSTCAST_JOBS must be a positive integer');
-  const paths = Array(jobs.length);
-  let next = 0;
+  let active = 0; const waiting = [], renders = [], frameJobs = new Map();
+  const frame = (clip) => {
+    if (!frameJobs.has(clip)) frameJobs.set(clip, lastFrame(root, clip));
+    return frameJobs.get(clip);
+  };
+  const render = async (b) => {
+    const clip = b.fade && (b.fade.from.piece !== undefined ? await renders[b.fade.from.piece] : previousClip);
+    const previousFrame = clip ? await frame(clip) : null;
+    if (active >= maxJobs) await new Promise((resolve) => waiting.push(resolve));
+    else active++;
+    try {
+      return await renderBeat(root, take, cfg, b, plan.keys,
+        log.filter(([ms]) => ms / 1000 >= b.a && ms / 1000 <= b.b), captionPieces(caps, b), hashes, getPill, previousFrame);
+    } finally {
+      if (waiting.length) waiting.shift()();
+      else active--;
+    }
+  };
+  let paths;
   try {
-    const worker = async () => {
-      while (next < jobs.length) { const i = next++; paths[i] = await jobs[i](); }
-    };
-    const results = await Promise.allSettled(Array.from({ length: Math.min(maxJobs, jobs.length) }, () => worker()));
+    for (const b of plan.beats) renders.push(render(b));
+    const results = await Promise.allSettled(renders);
     const failed = results.find((result) => result.status === 'rejected');
     if (failed) throw failed.reason;
+    paths = results.map((result) => result.value);
   } finally {
     if (browserPromise) { const browser = await browserPromise.catch(() => null); await browser?.close(); }
   }
@@ -297,7 +384,7 @@ export async function cut(root, take) {
   await join(paths, path.join(dir, `${take}.mp4`), root);
   writeJson(path.join(dir, `${take}.json`), meta);
   writeJson(path.join(dir, `${take}.beats.json`), paths.map((p) => path.relative(root, p)));
-  writeJson(path.join(dir, `${take}.captions.json`), { signature: captionSignature(root, cfg, caps) });
+  writeJson(path.join(dir, `${take}.captions.json`), { signature: captionSignature(root, cfg, caps, item, previousClip) });
   console.log(`${take}: ${plan.beats.length} beat(s), ${plan.beats.reduce((n, b) => n + b.ticks.length, 0)} frames, ${meta.duration.toFixed(2)}s`);
   return { paths, meta, caps };
 }
@@ -310,10 +397,11 @@ export async function assemble(root) {
     if (!fs.existsSync(clip)) { cues.push(`| — | **${item.take}** | MISSING: not cut yet |`); missing.push(item.take); continue; }
     let meta = readJson(path.join(root, 'clips', `${item.take}.json`));
     let caps = windows(item, meta);
+    const previousClip = item.transitions?.[meta.segments[0]?.segment] === 'fade' ? await previousTimelineClip(root, item.take) : null;
     const signature = path.join(root, 'clips', `${item.take}.captions.json`);
     const manifestFile = path.join(root, 'clips', `${item.take}.beats.json`);
     const missingBeats = !fs.existsSync(manifestFile) || readJson(manifestFile).some((p) => !fs.existsSync(path.resolve(root, p)));
-    if (missingBeats || !fs.existsSync(signature) || readJson(signature).signature !== captionSignature(root, cfg, caps)) {
+    if (missingBeats || !fs.existsSync(signature) || readJson(signature).signature !== captionSignature(root, cfg, caps, item, previousClip)) {
       if (!fs.existsSync(path.join(root, 'raw', item.take, 'frames.json')))
         throw new Error(`${item.take}: beats need rendering, but raw frames are missing; run cut with the raw take available`);
       await cut(root, item.take);

@@ -9,6 +9,7 @@ beats:
     panel: { use: title, title: "<The goal>" }
     claim: "<What the viewer will achieve>"
     say: "<State the goal>"
+    caption: "Follow the steps to see the result"
 
   - id: prerequisites
     surface: terminal

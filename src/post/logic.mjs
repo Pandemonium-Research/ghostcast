@@ -64,7 +64,10 @@ export function windows(item, meta) {
       if (!segs.has(c.from)) throw new Error(`${item.take}: caption "${c.text}" names segment ${c.from}, which the take does not have (${[...segs.keys()].join(', ')})`);
       const s = segs.get(c.from); base = s.start; end = s.end;
     }
-    const a = base + (c.at ?? 0), b = (c.until ?? 'end') === 'end' ? end : base + c.until;
+    const a = base + (c.at ?? 0);
+    // max caps how long a caption stays up, so "until the segment ends" can't outlast reading it.
+    let b = (c.until ?? 'end') === 'end' ? end : base + c.until;
+    if (c.max !== undefined) b = Math.min(b, a + c.max);
     out.push([c.text, a, Math.min(b, meta.duration), c.pos ?? 'bottom']);
   }
   for (const s of meta.segments) for (const p of s.pieces ?? [s])
@@ -79,7 +82,7 @@ export function captionPieces(caps, beat) {
   }));
 }
 
-export function beat_plan(log, frames, cfg, srcW, srcH, { targets = {}, readings = {}, unstable = {} } = {}) {
+export function beat_plan(log, frames, cfg, srcW, srcH, { targets = {}, readings = {}, unstable = {}, item = {}, previous = null } = {}) {
   const vp = log.find((e) => e[1] === 'viewport')?.[2];
   const directed = directCamera(log, cfg, srcW, srcH, vp ? srcW / vp.w : 1);
   const keys = view_track(directed, srcW, srcH, vp ? srcW / vp.w : 1, cfg);
@@ -134,5 +137,14 @@ export function beat_plan(log, frames, cfg, srcW, srcH, { targets = {}, readings
     beats.push({ segment: s.name, a: s.a, b: s.b, speed, start: pos, end: pos + n / fps, ticks });
     pos += n / fps;
   }
-  return { beats, keys, meta: { duration: Math.round(pos * 1000) / 1000, segments: meta } };
+  return { beats: transitionPlan(beats, item, cfg, previous), keys, meta: { duration: Math.round(pos * 1000) / 1000, segments: meta } };
+}
+
+export function transitionPlan(beats, item, cfg, previous = null) {
+  return beats.map((beat, index) => {
+    if ((index && beats[index - 1].segment === beat.segment) || item.transitions?.[beat.segment] !== 'fade') return beat;
+    const from = index ? { piece: index - 1, segment: beats[index - 1].segment }
+      : previous ?? { color: cfg.transitions?.color ?? '#000000' };
+    return { ...beat, fade: { seconds: Math.min(cfg.direction?.fadeSeconds ?? .5, beat.end - beat.start), from } };
+  });
 }

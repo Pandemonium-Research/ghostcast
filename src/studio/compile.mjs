@@ -60,6 +60,16 @@ export function compile(project) {
   const cache = path.join(root, 'cache');
   fs.mkdirSync(cache, { recursive: true });
   fs.writeFileSync(path.join(cache, 'storyboard.mjs'), module);
-  fs.writeFileSync(path.join(root, 'timeline.json'), JSON.stringify({ items: [{ take: 'storyboard', scene: 'cache/storyboard.mjs' }] }, null, 2) + '\n');
+  const configFile = path.join(root, 'project.json');
+  const config = (typeof project === 'string' ? null : project.config)
+    || (fs.existsSync(configFile) ? JSON.parse(fs.readFileSync(configFile, 'utf8')) : {});
+  // A caption stays until its beat ends, as the cut fits it, but never long enough to trip the
+  // caption-long check.
+  const captions = story.beats.filter((beat) => beat.caption).map((beat) => ({
+    text: beat.caption, from: beat.id, at: .3, until: 'end', max: (config.checks?.captionMaxSeconds ?? 8) - .5,
+  }));
+  const transitions = Object.fromEntries(story.beats.filter((beat) => (beat.transition ?? story.transition ?? 'cut') === 'fade')
+    .map((beat) => [beat.id, 'fade']));
+  fs.writeFileSync(path.join(root, 'timeline.json'), JSON.stringify({ items: [{ take: 'storyboard', scene: 'cache/storyboard.mjs', captions, transitions }] }, null, 2) + '\n');
   return { story, module };
 }

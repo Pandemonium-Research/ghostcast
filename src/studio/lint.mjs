@@ -97,17 +97,21 @@ export function lint(dir) {
   const audio = sources['audio.yaml'] ? parseYaml(sources['audio.yaml'], 'audio.yaml').data : null;
   if (brief.audio && audio?.provider && brief.audio !== audio.provider)
     push('error', 'audio', { file: 'audio.yaml', path: 'provider', message: `audio.yaml provider (${audio.provider}) must match brief.md audio (${brief.audio})` });
-  if (['kokoro', 'elevenlabs'].includes(audio?.provider))
-    push('warning', 'audio', { file: 'audio.yaml', path: 'provider', message: 'built-in speech is not available yet; the video will be silent until voice-over clips are placed' });
   const parsed = sources['storyboard.yaml'] ? parseYaml(sources['storyboard.yaml'], 'storyboard.yaml') : null;
   const storyboard = parsed?.data && typeof parsed.data === 'object' && !Array.isArray(parsed.data) ? parsed.data : {};
-  let wps = JSON.parse(fs.readFileSync(DEFAULTS, 'utf8')).voiceover.wordsPerSecond;
+  const defaults = JSON.parse(fs.readFileSync(DEFAULTS, 'utf8'));
+  let wps = defaults.voiceover.wordsPerSecond, readingWps = defaults.direction.readingWordsPerSecond;
   const configFile = path.join(root, 'project.json');
   if (fs.existsSync(configFile)) {
-    try { wps = JSON.parse(fs.readFileSync(configFile, 'utf8')).voiceover?.wordsPerSecond || wps; }
+    try {
+      const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+      wps = config.voiceover?.wordsPerSecond || wps;
+      readingWps = config.direction?.readingWordsPerSecond || readingWps;
+    }
     catch (error) { push('error', 'schema', { file: 'project.json', path: '', message: `invalid JSON: ${error.message}` }); }
   }
   if (!(wps > 0)) wps = 2.5;
+  if (!(readingWps > 0)) readingWps = 3;
   const beats = Array.isArray(storyboard.beats) ? storyboard.beats : [];
   const estimates = [];
   let placeholderBeats = 0;
@@ -126,6 +130,11 @@ export function lint(dir) {
     const count = words(beat.say), budget = Math.floor(budgetSeconds * wps);
     if (!placeholder(beat.say) && count > budget) at('say', 'word-budget', 'error', `${count} words; the budget is ${budget} (${budgetSeconds} s at ${wps} words/s). Cut the line or set seconds`);
     const estimate = estimates.at(-1);
+    if (beat.caption && !placeholder(beat.caption)) {
+      const count = words(beat.caption), need = count / readingWps + .5;
+      if (count > 10) at('caption', 'caption-words', 'warning', `${count} words; keep captions to at most 10 words`);
+      if (need > estimate.seconds) at('caption', 'caption-read', 'error', `caption needs ${need.toFixed(1)} s to read; the beat is estimated at ${estimate.seconds.toFixed(1)} s`);
+    }
     // Post fits a beat to its line: after the final hold (about 1.8 s with its margins), the rest of
     // the line is the room the actions get, and they play faster to fit it. `open` happens off
     // camera, between beats, so it takes none of that room.
