@@ -17,7 +17,7 @@ as work lands.
 | 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Done: first clip in 29 to 46 s on each OS |
 | 4 | [Plan](#stage-4--plan) | 2 | Done: a fresh agent reached an approved, rehearsed storyboard from SKILL.md alone |
 | 5 | [Direction](#stage-5--direction) | 4 | Done: the Skilldex story shoots from a storyboard, side by side with the original |
-| 6 | [Checks](#stage-6--checks) | 4, 5 | In progress: checks, sheets and confirmations done; the remake's editor beat is left |
+| 6 | [Checks](#stage-6--checks) | 4, 5 | Done: the checks find the hand-made cut's known issues; the three-beat remake checks clean and is confirmed |
 | 7 | [Voice](#stage-7--voice) | 1, 4 | Not started |
 | 8 | [Delivery](#stage-8--delivery) | 1, 7 | Not started |
 | 9 | [Engine interface](#stage-9--engine-interface) | 5, 6 | Not started |
@@ -480,7 +480,15 @@ Progress:
 - **Also fixed:** typing is paced by the clock (a loaded machine typed at a third of the pace);
   the sample project's terminal take works framed on its rows, so the sample checks clean; a
   YAML error from ": " in an unquoted value says how to fix it.
-- **Left:** the remake's editor beat, which needs the VS Code server.
+- **The whole remake passes:** all three beats (web, terminal, editor) rehearse clean, shoot in
+  23 s, check with no errors or warnings, and are confirmed; `ghostcast next` reports done. The
+  editor beat found one more bug: page text was logged a box per element, so VS Code's coloured
+  tokens read as `name`, `:`, `conventional-commit` and no quote spanning tokens could match.
+  Boxes on one visual row are now read as one line. The cut is the README's demo GIF.
+- **Seen on the way, not fixed:** the first rehearsal had the registry beat fail once in three
+  runs (the live site's search result never came within 15 s; a probe and a second rehearsal
+  found nothing wrong); rehearsal is what caught it. With the VS Code server downloaded today,
+  opening VS Code sometimes waits 30 s for its terminal's prompt and then reloads, which works.
 
 Decided (tuning stage 5's defaults against the hand-made cut): it makes 8.7 camera moves a minute,
 so the cap of 12 stands; its settled holds after a zoom run 0.2 to 1.5 s, so a 1.5 s minimum hold
