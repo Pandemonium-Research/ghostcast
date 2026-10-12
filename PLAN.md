@@ -17,7 +17,7 @@ as work lands.
 | 3 | [Quick shoots](#stage-3--quick-shoots) | 1, 2 | Done: first clip in 29 to 46 s on each OS |
 | 4 | [Plan](#stage-4--plan) | 2 | Done: a fresh agent reached an approved, rehearsed storyboard from SKILL.md alone |
 | 5 | [Direction](#stage-5--direction) | 4 | Done: the Skilldex story shoots from a storyboard, side by side with the original |
-| 6 | [Checks](#stage-6--checks) | 4, 5 | Not started |
+| 6 | [Checks](#stage-6--checks) | 4, 5 | In progress: checks, sheets and confirmations done; the remake's editor beat is left |
 | 7 | [Voice](#stage-7--voice) | 1, 4 | Not started |
 | 8 | [Delivery](#stage-8--delivery) | 1, 7 | Not started |
 | 9 | [Engine interface](#stage-9--engine-interface) | 5, 6 | Not started |
@@ -449,6 +449,46 @@ Done when:
 ## Stage 6 · Checks
 
 **Goal:** no issue a machine can catch reaches a final cut, and no beat is approved unseen.
+
+Progress:
+
+- **Page facts:** the recorder logs the visible text, text boxes and font sizes at segment starts
+  and ends, camera moves and holds.
+- **`ghostcast check`** re-plans the cut from `raw/` and reports problems at their time in the
+  final video. Exact checks, from logs and project files: small text once zoomed, captions too
+  long or too brief, show targets held too briefly, narration and voice pieces past their beat
+  (by `vo-mix`'s own rule), quoted words the page no longer shows, frozen pictures, cuts inside a
+  move, too many camera moves, emails, tokens and home paths, the untouched check, panel share
+  and the cap. Pixel checks, for takes shot before page facts: near-empty wide views (content
+  under 1% of the frame), small text lines, captions over content. `ghostcast all` runs it.
+- **On the hand-made Skilldex cut** (read only; the report written elsewhere) it finds the four
+  known issues: the caption held 23.7 s across beats, a caption over the text beneath it,
+  near-empty terminal frames, and the voice piece 3.4 s past its take. It also finds what nobody
+  had listed: four more captions held 8 to 21 s, three more captions over content, and three
+  `trims` that cut into a camera move. Stills at the flagged times confirm the pixel findings.
+- **Per-beat sheets** (`ghostcast review beats`) and **checkable confirmations**
+  (`ghostcast confirm <beat> "…"`): every quoted phrase must be in the page text logged during
+  the beat and one must come from the show target; a wrong one ("changelog-writer") and a lazy
+  one (two letters) are rejected, and a re-shoot voids the old ones. `ghostcast next` continues
+  through shoot, check, confirm and done.
+- **The remake:** the Skilldex storyboard's registry and validate beats pass the checks and are
+  confirmed. The checks' own bugs found on the way: a hold measured by its last piece only,
+  text judged at the view the camera was leaving, pixel line heights compared in the wrong
+  scale (which flagged nearly all text), crops sized from the config rather than the frames
+  (takes shot at 1× before stage 1 were unreadable), a voice rule stricter than `vo-mix`'s, and
+  a title card counted as an empty frame.
+- **Also fixed:** typing is paced by the clock (a loaded machine typed at a third of the pace);
+  the sample project's terminal take works framed on its rows, so the sample checks clean; a
+  YAML error from ": " in an unquoted value says how to fix it.
+- **Left:** the remake's editor beat, which needs the VS Code server.
+
+Decided (tuning stage 5's defaults against the hand-made cut): it makes 8.7 camera moves a minute,
+so the cap of 12 stands; its settled holds after a zoom run 0.2 to 1.5 s, so a 1.5 s minimum hold
+stands, at the calm end; reading time is capped at 4 s (`direction.readingMax`), since a long show
+target is glanced at while the narration explains it. Check thresholds (`checks` in
+project.json): text at least 16 px in the output, a show target 20 px; a caption at most 8 s; a
+picture frozen at most 4 s outside a hold; a wide view is near-empty when 88% of it is background
+and content covers under 1%; a caption may cover at most 3% ink.
 
 Build:
 

@@ -103,8 +103,10 @@ npx ghostcast template how-to     # a storyboard skeleton: launch, how-to, featu
 npx ghostcast lint                # one claim per beat, word budgets, panel share, the cap
 npx ghostcast rehearse            # every beat three times, without filming; flaky beats reported
 npx ghostcast approve storyboard  # after the user has approved the rehearsed plan
-npx ghostcast all                 # film the storyboard, cut and assemble
-npx ghostcast review final        # contact sheet in .ghostcast/out/review/final.png
+npx ghostcast all                 # film the storyboard, cut, assemble and check
+npx ghostcast check               # the report again: out/check-report.md, times in the video
+npx ghostcast review beats        # a sheet of stills per beat, to look at
+npx ghostcast confirm <beat> "…"  # what you see, quoting on-screen text; checked against the page
 ```
 
 A storyboard is a list of beats, each with what to do (`click`, `fill`, `press`, `run`, `wait`,
@@ -135,6 +137,8 @@ steps).
 | `ghostcast approve storyboard` | Record the user's approval against the storyboard's hash |
 | `ghostcast compile` | Storyboard → generated scene and timeline (record and all do this first) |
 | `ghostcast rehearse [beat…] [--runs 3] [--headed]` | Dry-run beats without filming; flaky beats reported |
+| `ghostcast check [--report file] [--json]` | Check the cut: text size, holds, captions, empty frames, secrets, voice placement |
+| `ghostcast confirm <beat> "…"` | Record what a beat shows; quoted text must be on the recorded page |
 | `ghostcast init <dir>` | A sample project of hand-written code scenes |
 | `ghostcast doctor` | Check the toolchain |
 | `ghostcast vscode [--port]` | Serve VS Code for editor scenes, with its settings and clean shell |
@@ -142,7 +146,7 @@ steps).
 | `ghostcast cut <take…>` | Frames → cached beats and captioned clip: segments, speed, zoom |
 | `ghostcast all [take…] [--keep-world]` | Share one world across takes, reset each take, then assemble |
 | `ghostcast assemble` | Cached beats → silent cut by stream copy + cue sheet |
-| `ghostcast review <take\|final> [--raw] [--at s]` | Contact sheets and stills |
+| `ghostcast review <take\|final\|beats> [--raw] [--at s]` | Contact sheets and stills; `beats` gives a sheet per beat |
 | `ghostcast vo-script` | Narration timed against the cut, with fit warnings |
 | `ghostcast pauses <audio…>` | Where to split voice-over clips |
 | `ghostcast vo-mix` | Lay the voice-over → final video + placement report |

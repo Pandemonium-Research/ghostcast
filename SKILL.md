@@ -57,15 +57,27 @@ Do what `next` says, then run it again. Its stages, in order:
    Only when **they** say yes, run `ghostcast approve storyboard`. Any later edit reopens the
    approval (after another rehearsal); `next` names the beats that changed.
 7. **Shoot.** `ghostcast all` films the storyboard, cuts and assembles
-   `.ghostcast/out/<video>-silent.mp4`.
-8. **Look.** `ghostcast review final` writes a contact sheet; `--at <seconds>` a full-size still.
-   **Open the images and look.** Is the text legible? Is the right thing framed? Is anything
-   stuck, cut off, or personal (a user name or home path in a prompt)? Fix the storyboard and
-   shoot again.
+   `.ghostcast/out/<video>-silent.mp4`, then runs the checks.
+8. **Check.** Read `.ghostcast/out/check-report.md` (`ghostcast check` runs it again). Each
+   problem gives its time in the video. Fix every error in the storyboard and shoot again: text
+   too small once zoomed, a show target held too briefly, a near-empty frame, an email, token or
+   home path on screen, narration longer than its beat. Warnings are yours to judge.
+9. **Confirm.** `ghostcast review beats` writes a sheet of three stills per beat. **Open each
+   sheet and look.** Is the right thing framed and legible? Is anything stuck, cut off or
+   personal? Then say what you see, quoting text that is on screen:
 
-Commit `.ghostcast/` with the project: the plan files, `approvals.json`, and your own `panels/`
-(HTML pages for panels) and `scenes/` (code scenes). `cache/`, `raw/`, `clips/`, `out/` and
-`logs/` are generated and git-ignored.
+   ```
+   ghostcast confirm send 'The last row reads "Invoice INV-001 sent".'
+   ```
+
+   Every quoted phrase is matched against the page text recorded in that beat, and one must come
+   from the beat's `show` target, so a confirmation written without looking is rejected. A
+   re-shoot voids the confirmations of the old take. `ghostcast review final` gives a contact
+   sheet of the whole cut, and `--at <seconds>` a full-size still.
+
+Commit `.ghostcast/` with the project: the plan files, `approvals.json`, `confirmations.json`,
+and your own `panels/` (HTML pages for panels) and `scenes/` (code scenes). `cache/`, `raw/`,
+`clips/`, `out/`, `logs/` and `vscode/` are generated and git-ignored.
 
 ## The storyboard
 
