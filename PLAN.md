@@ -484,7 +484,14 @@ Progress:
   23 s, check with no errors or warnings, and are confirmed; `ghostcast next` reports done. The
   editor beat found one more bug: page text was logged a box per element, so VS Code's coloured
   tokens read as `name`, `:`, `conventional-commit` and no quote spanning tokens could match.
-  Boxes on one visual row are now read as one line. The cut is the README's demo GIF.
+  Boxes on one visual row are now read as one line.
+- **The README's demo** is filmed from `demo/ticklist`, a small made-up task tracker in the repo
+  (web app, `ticklist` command, `tasks.json`), so anyone can re-shoot it. It found two more editor
+  bugs: `openFile` typed a relative path into Quick Open and pressed Enter on whatever came first,
+  and Quick Open leaves out git-ignored files, so a generated `tasks.json` opened as
+  `tasks.seed.json`; it now types the absolute path and fails unless the file it asked for opened.
+  And the `short` tab label showed a root file's parent, the world copy's random folder name; tabs
+  now show the file name alone.
 - **Seen on the way, not fixed:** the first rehearsal had the registry beat fail once in three
   runs (the live site's search result never came within 15 s; a probe and a second rehearsal
   found nothing wrong); rehearsal is what caught it. With the VS Code server downloaded today,

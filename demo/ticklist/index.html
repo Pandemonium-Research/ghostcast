@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Release week · ticklist</title>
+<style>
+  :root { --ink: #1f2430; --muted: #6b7284; --faint: #a3a8b8; --line: #e7e9f0; --accent: #4f46e5; --accent-soft: #eef0ff; --bg: #f6f7fb; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 20px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--bg); }
+  header { display: flex; align-items: center; gap: 12px; padding: 16px 40px; background: #fff; border-bottom: 1px solid var(--line); }
+  .mark { width: 32px; height: 32px; border-radius: 10px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .brand { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  main { max-width: 720px; margin: 48px auto; padding: 32px 40px 12px; background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 16px 40px rgba(31, 36, 48, .06); }
+  h1 { margin: 0; font-size: 34px; letter-spacing: -0.02em; }
+  .count { margin: 2px 0 24px; color: var(--muted); }
+  form { display: flex; gap: 12px; margin-bottom: 12px; }
+  input { flex: 1; min-width: 0; font: inherit; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; outline: none; }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  button { font: inherit; font-weight: 600; padding: 12px 26px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; cursor: pointer; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; gap: 16px; padding: 16px 6px; border-top: 1px solid var(--line); }
+  .tick { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid #c5c9d6; color: #fff; display: grid; place-items: center; font-size: 15px; }
+  li.done .tick { background: var(--accent); border-color: var(--accent); }
+  li.done .title { color: var(--muted); text-decoration: line-through; }
+  .id { margin-left: auto; color: var(--faint); font-size: 17px; }
+  li.new { animation: arrive 1.5s ease-out; }
+  @keyframes arrive { from { background: var(--accent-soft); } to { background: transparent; } }
+</style>
+<header><div class="mark">✓</div><span class="brand">ticklist</span></header>
+<main>
+  <h1>Release week</h1>
+  <p class="count" id="count">&nbsp;</p>
+  <form id="add">
+    <input name="task" aria-label="New task" placeholder="Add a task…" autocomplete="off">
+    <button>Add</button>
+  </form>
+  <ul id="list"></ul>
+</main>
+<script>
+  const list = document.getElementById('list'), count = document.getElementById('count'), form = document.getElementById('add');
+  function render(tasks, fresh) {
+    list.replaceChildren(...tasks.map((task) => {
+      const item = document.createElement('li');
+      item.className = `${task.done ? 'done' : ''} ${task.id === fresh ? 'new' : ''}`.trim();
+      item.innerHTML = `<span class="tick">${task.done ? '✓' : ''}</span><span class="title"></span><span class="id">#${task.id}</span>`;
+      item.querySelector('.title').textContent = task.title;
+      return item;
+    }));
+    const open = tasks.filter((task) => !task.done).length;
+    count.textContent = `${open} open · ${tasks.length - open} done`;
+  }
+  fetch('/api/tasks').then((res) => res.json()).then((tasks) => render(tasks));
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const title = form.elements.task.value.trim();
+    if (!title) return;
+    const res = await fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title }) });
+    const tasks = await res.json();
+    form.reset();
+    render(tasks, tasks.at(-1).id);
+  });
+</script>
+</html>

@@ -1,0 +1,27 @@
+video: ticklist-tour
+type: feature
+beats:
+  - id: add
+    surface: web
+    open: /
+    claim: Tasks are added in the web app.
+    do:
+      - fill: { New task: Write the release notes }
+      - click: Add
+    show: text "Write the release notes"
+    say: ticklist keeps a team's tasks. Add one in the web app and it joins the list as number four.
+
+  - id: finish
+    surface: terminal
+    claim: The command line works on the same list.
+    do:
+      - run: ticklist done 4
+    show: 'row "Done: Write the release notes"'
+    say: The command line works on the same list, so you can finish it from the terminal.
+
+  - id: file
+    surface: editor
+    open: tasks.json
+    claim: The list is one plain JSON file.
+    show: line "Write the release notes"
+    say: Underneath, it is one plain JSON file, a task per line.

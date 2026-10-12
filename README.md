@@ -10,12 +10,12 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/skilldex-story.gif" width="800" alt="A web registry is searched, a CLI validates a skill in a terminal, and the skill's SKILL.md opens in VS Code; the camera eases in on each result, or highlights it.">
+  <img src="docs/media/ticklist.gif" width="800" alt="A task is added in a web app, marked done with a command in a terminal, and shown as done in its JSON file in VS Code; the camera eases in on each result.">
 </p>
 <p align="center">
-  <sub>Filmed from <a href="#a-planned-video">the storyboard below</a>: a live web page, then a
-  real terminal and VS Code working in a copy of the project. No sleeps, zooms or timestamps were
-  written.</sub>
+  <sub>Filmed from <a href="#a-planned-video">the storyboard below</a>: a web app, a real terminal
+  and VS Code, all working on a disposable copy of the project. No sleeps, zooms or timestamps
+  were written.</sub>
 </p>
 
 ghostcast drives real terminals, editors and web apps in a headless Chrome, keeps every frame,
@@ -113,38 +113,42 @@ exit code is reported even when it fails. No project files are needed.
 
 For a how-to, a feature or a launch, the plan lives in `.ghostcast/` next to the code it shows.
 A storyboard is a list of beats: what to do, what the viewer must see, and what is said. This is
-the one that made the video at the top:
+the one that made the video at the top, for ticklist, a small task tracker in
+[`demo/ticklist/`](demo/ticklist):
 
 ```yaml
 # .ghostcast/storyboard.yaml
-video: skilldex-story
+video: ticklist-tour
 type: feature
 beats:
-  - id: registry
+  - id: add
     surface: web
-    open: https://skilldex-web.vercel.app/
-    claim: Skilldex is a searchable registry of agent skills.
+    open: /
+    claim: Tasks are added in the web app.
     do:
-      - click: Browse registry
-      - fill: { "Search skills…": release notes }
-    show: text "release-notes"
-    say: Skilldex is a registry of agent skills. Search it for what you need, like release notes.
+      - fill: { New task: Write the release notes }
+      - click: Add
+    show: text "Write the release notes"
+    say: ticklist keeps a team's tasks. Add one in the web app and it joins the list as number four.
 
-  - id: validate
+  - id: finish
     surface: terminal
-    claim: The CLI scores a skill before it is published.
+    claim: The command line works on the same list.
     do:
-      - run: skillpm validate skills/conventional-commit
-    show: row "Format conformance score"
-    say: The CLI validates a skill before you publish it, check by check, and gives it a score out of a hundred.
+      - run: ticklist done 4
+    show: 'row "Done: Write the release notes"'
+    say: The command line works on the same list, so you can finish it from the terminal.
 
-  - id: skill-file
+  - id: file
     surface: editor
-    open: skills/conventional-commit/SKILL.md
-    claim: A skill is a folder with a SKILL.md.
-    show: line "description:"
-    say: A skill is a folder with a SKILL.md, with a name, a description, and instructions.
+    open: tasks.json
+    claim: The list is one plain JSON file.
+    show: line "Write the release notes"
+    say: Underneath, it is one plain JSON file, a task per line.
 ```
+
+Its `world.yaml` starts the web app in each copy and seeds the tasks; run `ghostcast next` in
+`demo/ticklist` to film it yourself.
 
 `ghostcast next` says where the video stands and the one thing to do next. The whole loop:
 
@@ -278,6 +282,7 @@ directory). `ghostcast --help` lists every option.
 | [`docs/gotchas.md`](docs/gotchas.md) | The capture problems ghostcast works around, and how |
 | [`VISION.md`](VISION.md) | Where ghostcast is going, and why |
 | [`PLAN.md`](PLAN.md) | The stages toward version 1, with progress and decisions |
+| [`demo/ticklist/`](demo/ticklist) | The project filmed for the video above, with its whole plan |
 | [`docs/bakeoff.md`](docs/bakeoff.md) | One developer-tool story filmed by several agent video tools |
 | [`test/README.md`](test/README.md) | The test suite and its vectors |
 
