@@ -520,7 +520,9 @@ test('Chrome + ffmpeg: lower thirds wrap at fixed size, mirror at the top and ke
       if (pos !== 'corner') {
         assert.ok(right - left + 1 <= Math.floor(1920 * .7));
         assert.ok(accent > 0);
-        const bands = [...rows].sort((a, b) => a - b).filter((row, i, all) => !i || row > all[i - 1] + 1);
+        // Rows of text, allowing small gaps inside a line: in some fonts (macOS's fallback) the dot
+        // of an i sits a few blank rows above its stem.
+        const bands = [...rows].sort((a, b) => a - b).filter((row, i, all) => !i || row > all[i - 1] + 6);
         assert.equal(bands.length, 2, 'text wraps to two lines at the configured font size');
         assert.ok(bottom - top + 1 >= 2 * Math.ceil(34 * 1.25));
         const center = ((top + bottom) >> 1) * 1920 + ((left + right) >> 1);
