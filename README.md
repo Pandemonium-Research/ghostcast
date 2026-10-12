@@ -1,43 +1,49 @@
-# ghostcast
+<h1 align="center">ghostcast</h1>
 
-*Screencasts with nobody at the keyboard.* ghostcast films real software in the background
-(terminals, editors and web apps) while your agent directs.
+<p align="center">
+  <b>Screencasts of real software, filmed in the background while your coding agent directs.</b>
+</p>
 
-> **Status: 0.1, with Node post-production.** Everything below works today. [VISION.md](VISION.md)
-> describes the product being built on it, and [PLAN.md](PLAN.md) the stages toward version 1.
+<p align="center">
+  <a href="https://github.com/Sampriti2803/ghostcast/actions/workflows/ci.yml"><img src="https://github.com/Sampriti2803/ghostcast/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A520-339933" alt="Node 20 or newer">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-555" alt="Windows, macOS and Linux">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+</p>
 
-An agent writes a scene per shot: open a clean terminal on a project, type a command, zoom onto the line
-that answers it. ghostcast plays the scene in an off-screen Chrome and keeps every frame, so
-nothing on your screen is recorded and nothing on it gets in the way. The frames become a
-finished video:
+<p align="center">
+  <img src="docs/media/skilldex-story.gif" width="800" alt="A web registry is searched, a CLI validates a skill in a terminal, and the skill's SKILL.md opens in VS Code; the camera eases in on each result, or highlights it.">
+</p>
+<p align="center">
+  <sub>Filmed from <a href="#a-planned-video">the storyboard below</a>: a live web page, then a
+  real terminal and VS Code working in a copy of the project. No sleeps, zooms or timestamps were
+  written.</sub>
+</p>
 
-- cut to the beats;
-- eased into zooms on what matters;
-- captioned;
-- tagged wherever time is sped up;
-- with recorded narration laid on the beats it describes.
+ghostcast drives real terminals, editors and web apps in a headless Chrome, keeps every frame,
+and turns them into a finished video: cut to the beats, framed on what matters, timed to the
+narration and checked before anyone watches it. Nothing on your screen is recorded or touched,
+and every shoot runs in a disposable copy of your project.
 
-Post-production is deterministic: a retake is one command, and the edit is data
-(`timeline.json`, `voiceover/plan.json`), not a timeline in a video editor.
+> [!NOTE]
+> **Pre-release (0.1).** Quick shoots, storyboards, the automatic camera and timing, and the
+> checks work today on Windows, macOS and Linux. Built-in speech, output presets and the engine
+> interface are next: see the [roadmap](#roadmap). ghostcast is not on npm yet; install it from
+> source.
 
-For a product checkout, add `world` to `project.json` with `source` pointing to it. Each shoot
-uses a disposable copy under the ghostcast cache. Snapshot mode includes current uncommitted
-edits and untracked files; commit mode checks out a chosen `ref`. The source is fingerprinted
-before and after recording. See [the world example](templates/project/world.example.json) and
-[scene API](docs/scene-api.md).
+## Contents
 
-Recording real tools without a screen has sharp edges: frames that stop arriving, keystrokes
-that vanish, terminals that ignore synthetic input. ghostcast handles them, and
-[`docs/gotchas.md`](docs/gotchas.md) explains each one.
-
-```
-scene.mjs ──record──▶ raw/<take>/ frames + event log
-                         │ cut: render cached beats with zooms, captions and speed tags
-                         ▼
-                      clips/<take>.mp4 ──assemble: stream copy, cap check────────▶ out/<name>-silent.mp4
-                                                                                   │ + cue sheet
-                      voiceover/*.m4a + plan.json ──vo-mix: place, fade, −16 LUFS──▶ out/<name>.mp4
-```
+- [Why ghostcast](#why-ghostcast)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [A planned video](#a-planned-video)
+- [How it works](#how-it-works)
+- [Commands](#commands)
+- [Documentation](#documentation)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Related tools](#related-tools)
+- [License](#license)
 
 ## Why ghostcast
 
@@ -45,113 +51,131 @@ Plenty of tools make videos with agents now. Most film a web app and narrate it 
 speech; some draw terminals instead of filming them, or rebuild the product's UI in code.
 ghostcast is for videos of software as it really runs.
 
-- **Real terminals, a real editor, real web apps, filmed as pixels.**
-  - Terminal scenes use a local xterm page with a clean, real shell. Editor scenes can use VS Code
-    in the browser (`code serve-web`).
-  - Commands are typed at a human pace, checked on screen before Enter, and waited on until the
-    prompt returns.
-  - Agent CLIs (Claude Code, Codex) can run on camera.
-  - Nothing is drawn or rebuilt.
-- **In the background.** Everything is captured from a headless browser: nothing on your screen
-  is recorded, and nothing on it is touched.
-- **Framed from the page.** ghostcast knows what's on the page, so zoom rectangles fit the text of
-  a terminal row or an editor line, not a guess from pixels.
-- **Honest by design.**
-  - Everything shown really runs.
-  - Every sped-up stretch is tagged `N×` on screen.
-  - A length cap is checked on every assemble, and a cue sheet gives every beat's start.
-- **Your own voice, placed by beat.**
-  - The narrator reads from a generated script that says whether each block fits.
-  - Their clips are split at detected pauses, and each piece is anchored to the beat it describes.
-  - The mix is normalised for broadcast loudness.
-- **Agents review their own footage.** Contact sheets and stills are PNGs an agent can look at,
-  and a failed take leaves a screenshot of where it stopped.
+- **Real software, filmed as pixels.** Terminal scenes run a real shell in xterm.js; editor
+  scenes run VS Code in the browser; web scenes are your app or any site. Commands are typed at a
+  human pace, checked on screen before Enter, and waited on until the prompt returns. Agent CLIs
+  can run on camera. Nothing is drawn or rebuilt.
+- **In the background.** Everything is captured from a headless browser, so you keep working
+  while it shoots. Heavy work runs at low priority.
+- **Your work is never touched.** Each shoot and rehearsal runs in a disposable copy of the
+  project, with its own services, ports and browser profile. The source is fingerprinted before
+  and after, and a shoot fails if it changed.
+- **Directed from intent.** A storyboard says what to do and what the viewer must see. The camera
+  frames the text it reads from the page (a terminal row, an editor line, a button), and each
+  beat is fitted to its line: still holds shorten first, then moves play faster.
+- **Honest by design.** Everything shown really runs. Every sped-up stretch is tagged `N×` on
+  screen. Checks report small text, overlong holds, near-empty frames, secrets on screen and
+  misplaced narration, and an agent's description of a beat must quote text that was really on
+  the page.
+- **Agents review their own footage.** Contact sheets and stills are images an agent can look
+  at, and a failed take leaves a screenshot of where it stopped.
+
+## Install
+
+Requirements:
+
+- Node 20 or newer, and Google Chrome (or Edge, via `browser.channel`).
+- ffmpeg on `PATH`.
+- Bash for terminal scenes: Git Bash on Windows, `/bin/bash` on macOS and Linux.
+- The `code` CLI, only for editor scenes.
+
+Until the first npm release, install from source:
+
+```bash
+git clone https://github.com/Sampriti2803/ghostcast.git
+cd ghostcast
+npm install
+npm link            # puts `ghostcast` on your PATH
+ghostcast doctor    # checks Node, Chrome, ffmpeg, bash and the VS Code CLI
+```
+
+Once it is published, `npx ghostcast` will replace these steps.
 
 ## Quick start
 
 From the directory you want to film:
 
 ```bash
-npx ghostcast shoot "npm test"
-npx ghostcast shoot https://example.com
+ghostcast shoot "npm test"
+ghostcast shoot https://example.com
 ```
 
-Each quick shoot writes a 1080p `<name>.mp4` and a looping `<name>.gif` in the current
-directory. A command runs in a disposable copy of that directory; `--in <dir>` chooses another
-source, `--out <file>` chooses the output name, `--timeout <seconds>` caps a command's wait,
-and `--keep` retains the temporary project for inspection. A command's exit code is reported
-even when it fails. No project files are needed.
+Each quick shoot writes a 1080p `<name>.mp4` and a looping `<name>.gif` (under 10 MB, for a
+README) in the current directory. A command runs in a disposable copy of that directory, and its
+exit code is reported even when it fails. No project files are needed.
 
-Requirements:
+| Option | |
+|---|---|
+| `--in <dir>` | Film a command in another directory |
+| `--out <file>` | Name the outputs |
+| `--timeout <seconds>` | Cap how long a command may run |
+| `--keep` | Keep the temporary project for inspection |
 
-- Node 20+ and Google Chrome (or Edge, via `browser.channel`).
-- ffmpeg on `PATH`.
-- On Windows, Git Bash for terminal scenes; on macOS and Linux, `/bin/bash`.
-- The `code` CLI only for editor scenes.
+## A planned video
 
-`npx ghostcast doctor` checks them.
+For a how-to, a feature or a launch, the plan lives in `.ghostcast/` next to the code it shows.
+A storyboard is a list of beats: what to do, what the viewer must see, and what is said. This is
+the one that made the video at the top:
 
-### A planned video
+```yaml
+# .ghostcast/storyboard.yaml
+video: skilldex-story
+type: feature
+beats:
+  - id: registry
+    surface: web
+    open: https://skilldex-web.vercel.app/
+    claim: Skilldex is a searchable registry of agent skills.
+    do:
+      - click: Browse registry
+      - fill: { "Search skills…": release notes }
+    show: text "release-notes"
+    say: Skilldex is a registry of agent skills. Search it for what you need, like release notes.
 
-For a how-to, a feature or a launch, the plan lives in `.ghostcast/` next to the code it shows,
-and `ghostcast next` says what to do at each step:
+  - id: validate
+    surface: terminal
+    claim: The CLI scores a skill before it is published.
+    do:
+      - run: skillpm validate skills/conventional-commit
+    show: row "Format conformance score"
+    say: The CLI validates a skill before you publish it, check by check, and gives it a score out of a hundred.
+
+  - id: skill-file
+    surface: editor
+    open: skills/conventional-commit/SKILL.md
+    claim: A skill is a folder with a SKILL.md.
+    show: line "description:"
+    say: A skill is a folder with a SKILL.md, with a name, a description, and instructions.
+```
+
+`ghostcast next` says where the video stands and the one thing to do next. The whole loop:
 
 ```bash
-npx ghostcast init                # adds .ghostcast/: product.md, brief.md, world.yaml, audio.yaml
-npx ghostcast next                # where the video stands, and the one next action
-npx ghostcast template how-to     # a storyboard skeleton: launch, how-to, feature or receipt
-npx ghostcast lint                # one claim per beat, word budgets, panel share, the cap
-npx ghostcast rehearse            # every beat three times, without filming; flaky beats reported
-npx ghostcast approve storyboard  # after the user has approved the rehearsed plan
-npx ghostcast all                 # film the storyboard, cut, assemble and check
-npx ghostcast check               # the report again: out/check-report.md, times in the video
-npx ghostcast review beats        # a sheet of stills per beat, to look at
-npx ghostcast confirm <beat> "…"  # what you see, quoting on-screen text; checked against the page
+ghostcast init                # adds .ghostcast/: product.md, brief.md, world.yaml, audio.yaml
+ghostcast next                # where the video stands, and the next action
+ghostcast template how-to     # a storyboard skeleton: launch, how-to, feature or receipt
+ghostcast lint                # one claim per beat, word budgets, panel share, the length cap
+ghostcast rehearse            # every beat three times, unfilmed; flaky beats reported
+ghostcast approve storyboard  # once the user has approved the rehearsed plan
+ghostcast all                 # film, cut, assemble and check
+ghostcast review beats        # a sheet of stills per beat, to look at
+ghostcast confirm <beat> "…"  # what the beat shows, quoting on-screen text; checked against the page
 ```
 
-A storyboard is a list of beats, each with what to do (`click`, `fill`, `press`, `run`, `wait`,
-or Playwright code), what the viewer must see (`show`) and what is said (`say`). There are no
-sleeps, zoom calls or timestamps in it. [`SKILL.md`](SKILL.md) has the format.
+Editor beats need VS Code in the browser: read the
+[VS Code Server license](https://aka.ms/vscode-server-license), then run
+`ghostcast vscode --accept-server-license-terms` and wait for "VS Code is ready".
 
-Only editor scenes need `ghostcast vscode --accept-server-license-terms`. Read the VS Code Server
-license before using that command. Its first run downloads the server; wait for "VS Code is ready"
-before recording an editor scene.
+> [!TIP]
+> **For agents:** load [`SKILL.md`](SKILL.md). It has the workflow, the storyboard format and the
+> rules: honest timing, nothing faked, no personal data, only the user approves, and ask before
+> costly or outward-facing steps.
 
-`ghostcast init <dir>` makes a sample project of hand-written code scenes (a title card, a
-terminal take and a web take, about 30 s): the engine the storyboard compiles to, documented in
-[`docs/scene-api.md`](docs/scene-api.md).
+### Beyond the storyboard
 
-**For agents:** load [`SKILL.md`](SKILL.md). It has the workflow and the rules (honest timing,
-nothing faked, no personal data, only the user approves, ask before costly or outward-facing
-steps).
-
-## Commands
-
-| | |
-|---|---|
-| `ghostcast shoot <command\|url> [--in dir] [--out file] [--timeout seconds] [--keep]` | Film one command or page into an MP4 and GIF, with no project |
-| `ghostcast init` | Add `.ghostcast/` to this repository |
-| `ghostcast next [--json]` | Where the video stands, and the one next action |
-| `ghostcast template <type> [--force]` | Storyboard skeleton: launch, how-to, feature or receipt |
-| `ghostcast lint [--json]` | Check the plan files and estimate each beat against the cap |
-| `ghostcast approve storyboard` | Record the user's approval against the storyboard's hash |
-| `ghostcast compile` | Storyboard → generated scene and timeline (record and all do this first) |
-| `ghostcast rehearse [beat…] [--runs 3] [--headed]` | Dry-run beats without filming; flaky beats reported |
-| `ghostcast check [--report file] [--json]` | Check the cut: text size, holds, captions, empty frames, secrets, voice placement |
-| `ghostcast confirm <beat> "…"` | Record what a beat shows; quoted text must be on the recorded page |
-| `ghostcast init <dir>` | A sample project of hand-written code scenes |
-| `ghostcast doctor` | Check the toolchain |
-| `ghostcast vscode [--port]` | Serve VS Code for editor scenes, with its settings and clean shell |
-| `ghostcast record <take> [--headed] [--keep-world]` | Run a scene and capture it in one isolated world |
-| `ghostcast cut <take…>` | Frames → cached beats and captioned clip: segments, speed, zoom |
-| `ghostcast all [take…] [--keep-world]` | Share one world across takes, reset each take, then assemble |
-| `ghostcast assemble` | Cached beats → silent cut by stream copy + cue sheet |
-| `ghostcast review <take\|final\|beats> [--raw] [--at s]` | Contact sheets and stills; `beats` gives a sheet per beat |
-| `ghostcast vo-script` | Narration timed against the cut, with fit warnings |
-| `ghostcast pauses <audio…>` | Where to split voice-over clips |
-| `ghostcast vo-mix` | Lay the voice-over → final video + placement report |
-
-## A scene
+A beat the storyboard can't express can point at a code scene, and `ghostcast init <dir>` makes a
+sample project of hand-written scenes. They use the engine the storyboard compiles to,
+documented in [`docs/scene-api.md`](docs/scene-api.md):
 
 ```js
 // scenes/build.mjs
@@ -170,36 +194,125 @@ export default async function (h) {
 }
 ```
 
-## Where it's going
+## How it works
 
-ghostcast is growing into two things (details in [VISION.md](VISION.md)):
+```
+storyboard.yaml ──compile──▶ scene ──record──▶ raw/<take>/  frames + event log
+                                                   │
+                                                   │  cut: fit each beat to its line, ease the camera,
+                                                   ▼       render cached beats with speed tags
+                                               clips/<take>.mp4
+                                                   │
+                                                   │  assemble: join by stream copy, cap check, cue sheet
+                                                   ▼
+                                               out/<name>-silent.mp4 ──check──▶ out/check-report.md
+                                                   │
+                                                   │  vo-mix: place voice clips by beat, −16 LUFS
+                                                   ▼
+                                               out/<name>.mp4
+```
 
-- **A studio for developer-tool videos.** Your agent plans a storyboard with you; ghostcast
-  prepares, rehearses, shoots, checks and voices it in the background. It uses Kokoro speech by
-  default, ElevenLabs with your own key, or your own voice through a recording booth.
-- **An engine** that other video pipelines call when they need real footage of real software.
+- **Capture.** Playwright drives Chrome headless, and a CDP screencast keeps every frame, at
+  twice the viewport's pixel density by default. The page logs what happened and where (each command, each
+  click, the rectangle of each target), so post-production knows the page without reading pixels.
+- **Isolation.** `.ghostcast/world.yaml` says how to make the copy: a snapshot of the working
+  tree or a chosen commit, files to copy in, setup commands, and services with their own ports.
+- **Post-production.** It is deterministic, and the edit is data (`timeline.json`,
+  `voiceover/plan.json`), not a timeline in a video editor. Beats are rendered once and cached;
+  changing a line re-fits the cut without a re-shoot, and a retake is one command.
 
-Planned for version 1 ([PLAN.md](PLAN.md)):
+Recording real tools without a screen has sharp edges: frames that stop arriving, keystrokes
+that vanish, terminals that ignore synthetic input. [`docs/gotchas.md`](docs/gotchas.md) explains
+how ghostcast handles each one.
 
-- one-command install (`npx ghostcast`);
-- quick shoots with no configuration;
-- storyboards instead of scripts, with automatic camera, holds and checks;
-- voice from any source, placed by beat;
-- output presets for GitHub, social feeds, YouTube and submissions;
-- a JSON interface for other pipelines.
+## Commands
 
-## Status
+`--project <dir>` picks the project (by default `./.ghostcast` when it exists, else the current
+directory). `ghostcast --help` lists every option.
 
-Version 0.1, with post-production in Node. Beats are rendered once and cached under
-`cache/beats/`; assembly joins those beats without re-encoding. No Python is needed. CI runs
-the whole suite, real headless shoots included, on Windows, macOS and Ubuntu with Node 22, and
-times a first clip from a clean install on each (29 to 46 s).
+**Quick shoots**
 
-`npm test` runs the unit tests and an end-to-end smoke test; see [`test/README.md`](test/README.md).
+| Command | |
+|---|---|
+| `ghostcast shoot <command\|url>` | Film one command or page into an MP4 and a GIF, with no project |
+| `ghostcast doctor` | Check the toolchain |
 
-## License
+**The studio**
 
-MIT. See [LICENSE](LICENSE).
+| Command | |
+|---|---|
+| `ghostcast init` | Add `.ghostcast/` to this repository |
+| `ghostcast next [--json]` | Where the video stands, and the next action |
+| `ghostcast template <type> [--force]` | Storyboard skeleton: launch, how-to, feature or receipt |
+| `ghostcast lint [--json]` | Check the plan files and estimate each beat against the cap |
+| `ghostcast rehearse [beat…] [--runs 3] [--headed]` | Dry-run beats without filming; flaky beats reported |
+| `ghostcast approve storyboard` | Record the user's approval against the storyboard's hash |
+| `ghostcast check [--report file] [--json]` | Check the cut: text size, holds, captions, empty frames, secrets, voice placement |
+| `ghostcast confirm <beat> "…"` | Record what a beat shows; quoted text must be on the recorded page |
+| `ghostcast vscode [--port 8765] --accept-server-license-terms` | Serve VS Code in the browser for editor beats |
+
+**The engine**
+
+| Command | |
+|---|---|
+| `ghostcast init <dir>` | A sample project of hand-written code scenes |
+| `ghostcast compile` | Storyboard → generated scene and timeline (`record` and `all` do this first) |
+| `ghostcast record <take> [--headed] [--keep-world]` | Run a scene and capture it in an isolated world |
+| `ghostcast cut <take…>` | Frames → cached beats and a clip: segments, speed, camera |
+| `ghostcast assemble` | Cached beats → silent cut by stream copy, with a cue sheet |
+| `ghostcast all [take…] [--keep-world]` | Record and cut each take in one shared world, then assemble and check |
+| `ghostcast review <take\|final\|beats> [--raw] [--at s]` | Contact sheets and stills |
+
+**Voice-over**
+
+| Command | |
+|---|---|
+| `ghostcast vo-script` | Narration timed against the cut, with fit warnings |
+| `ghostcast pauses <audio…>` | Where to split recorded clips |
+| `ghostcast vo-mix [--plan file]` | Lay the voice-over → final video and a placement report |
+
+## Documentation
+
+| | |
+|---|---|
+| [`SKILL.md`](SKILL.md) | The agent workflow, the storyboard format, worlds, audio and rules |
+| [`docs/scene-api.md`](docs/scene-api.md) | The engine: code scenes and their helpers |
+| [`docs/gotchas.md`](docs/gotchas.md) | The capture problems ghostcast works around, and how |
+| [`VISION.md`](VISION.md) | Where ghostcast is going, and why |
+| [`PLAN.md`](PLAN.md) | The stages toward version 1, with progress and decisions |
+| [`docs/bakeoff.md`](docs/bakeoff.md) | One developer-tool story filmed by several agent video tools |
+| [`test/README.md`](test/README.md) | The test suite and its vectors |
+
+## Roadmap
+
+ghostcast is growing into two things: **a studio** for videos of developer tools, driven by the
+coding agent you already use, and **an engine** that other video pipelines call when they need
+real footage of real software. [VISION.md](VISION.md) has the details, and [PLAN.md](PLAN.md)
+the stages.
+
+| | |
+|---|---|
+| **Done** | One-command install and quick shoots (a first clip in under a minute on each OS, timed in CI); isolation; the studio plan and `ghostcast next`; automatic camera and timing; checks and confirmations |
+| **Next** | Voice from any source, fitted by beat: Kokoro locally by default, ElevenLabs with your own key, or your own recordings |
+| **Then** | Output presets for GitHub, social feeds, YouTube and submissions, with narration as captions; a JSON interface for other pipelines; version 1 on npm |
+
+## Contributing
+
+Issues and pull requests are welcome. To work on ghostcast:
+
+```bash
+npm install
+npm test             # everything, including real headless shoots (needs Chrome and ffmpeg)
+npm run test:unit    # the faster subset: post-production, worlds, the studio and checks
+```
+
+CI runs the whole suite on Windows, macOS and Ubuntu. When a rule changes or a bug is fixed, add
+a case to [`test/vectors/`](test/vectors); when you work around a capture problem, add it to
+[`docs/gotchas.md`](docs/gotchas.md).
+
+ghostcast builds on [Playwright](https://playwright.dev), [xterm.js](https://xtermjs.org),
+[node-pty](https://github.com/microsoft/node-pty), [ffmpeg](https://ffmpeg.org) and
+[VS Code in the browser](https://code.visualstudio.com/docs/remote/vscode-server).
 
 ## Related tools
 
@@ -209,11 +322,11 @@ If your video is a different kind, one of these may fit better:
   [OpenMontage](https://github.com/calesthio/OpenMontage), with a screen-demo pipeline among
   many others.
 - **A web app, narrated by generated speech:**
-  - [openvidstudio](https://github.com/AnayDhawan/openvidstudio)
-  - [aidemo](https://aidemo.top/)
-  - [reelson](https://github.com/reelson/reelson)
-  - [agent-demo-video](https://github.com/OrionArchitekton/agent-demo-video)
-  - [screencli](https://screencli.sh)
+  [openvidstudio](https://github.com/AnayDhawan/openvidstudio),
+  [aidemo](https://aidemo.top/),
+  [reelson](https://github.com/reelson/reelson),
+  [agent-demo-video](https://github.com/OrionArchitekton/agent-demo-video) and
+  [screencli](https://screencli.sh).
 - **The product's UI rebuilt as animation:**
   [agentic-product-demo](https://github.com/Alexwtlf/agentic-product-demo).
 - **Recording yourself, polished automatically:**
@@ -223,3 +336,7 @@ If your video is a different kind, one of these may fit better:
 - **Motion graphics written as code:**
   [HyperFrames](https://github.com/heygen-com/hyperframes) and
   [Remotion](https://www.remotion.dev).
+
+## License
+
+[MIT](LICENSE)
