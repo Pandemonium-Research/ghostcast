@@ -3,9 +3,15 @@ import path from 'node:path';
 import { parseYaml } from '../studio/schema.mjs';
 import { words } from '../studio/lint.mjs';
 
-export const directionDefaults = Object.freeze({ readingWordsPerSecond: 3, readingBase: .5,
+export const directionDefaults = Object.freeze({ readingWordsPerSecond: 3, readingBase: .5, readingMax: 4,
   minHold: 1.5, minBeat: 2, movesPerMinute: 12, minZoomGain: 1.2, maxSpeed: 12, stillSsim: .995 });
 export const direction = (cfg = {}) => ({ ...directionDefaults, ...cfg.direction });
+// How long a show target needs on screen. A long target (a paragraph) is glanced at while the
+// narration explains it, not read through, so the time is capped.
+export function readingSeconds(text, cfg = {}) {
+  const policy = direction(cfg);
+  return Math.min(policy.readingMax, policy.readingBase + words(text) / policy.readingWordsPerSecond);
+}
 
 const EPS = 1e-9;
 const duration = (span) => span.b - span.a;
@@ -120,7 +126,7 @@ export function fitTargets(root, take, log, cfg = {}) {
     const end = log.findIndex((e, i) => i > start && e[1] === `-${id}`);
     if (start < 0 || end < 0) continue;
     const show = log.slice(start, end + 1).filter((e) => e[1] === 'show').at(-1);
-    if (show) readings[id] = policy.readingBase + words(show[2]?.text) / policy.readingWordsPerSecond;
+    if (show) readings[id] = readingSeconds(show[2]?.text, cfg);
   }
   return { targets, readings };
 }

@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { loadProject } from '../project.mjs';
 import { beat_plan, windows, box_at, segments } from '../post/logic.mjs';
-import { fitTargets, directCamera, motionIntervals } from '../post/fit.mjs';
+import { fitTargets, directCamera, motionIntervals, readingSeconds } from '../post/fit.mjs';
 import { place } from '../post/voice.mjs';
 import { probeSize } from '../post/render.mjs';
 import { parseYaml, readBrief } from '../studio/schema.mjs';
@@ -152,7 +152,7 @@ function factsChecks(c, problems, thresholds) {
       const from = hold ? hold[0] / 1000 : src.a, to = src.b;
       const duration = c.plan.beats.filter((b) => b.segment === name)
         .reduce((sum, b) => sum + Math.max(0, Math.min(b.b, to) - Math.max(b.a, from)) / (b.speed || 1), 0);
-      const need = (c.cfg.direction?.readingBase ?? .5) + words(show?.[2]?.text) / (c.cfg.direction?.readingWordsPerSecond || 3);
+      const need = readingSeconds(show?.[2]?.text, c.cfg);
       if (duration < need - .1) problems.push(makeProblem(c.take, 'show-visible', 'error', seg.start, `the hold on the show target is ${duration.toFixed(1)}s; reading it needs ${need.toFixed(1)}s`, name, seg.end));
     }
     if (seg) {
@@ -281,7 +281,7 @@ function pixels(c, problems, thresholds) {
       const srcSeg = segments(c.log).find((seg) => seg.name === id);
       const show = srcSeg && c.log.filter((e) => e[1] === 'show' && e[0] / 1000 >= srcSeg.a && e[0] / 1000 <= srcSeg.b).at(-1);
       const target = beat ? Math.max(c.cfg.direction?.minBeat ?? 2, words(beat.say || '') / (c.cfg.voiceover?.wordsPerSecond || 2.5) + .6,
-        (c.cfg.direction?.readingBase ?? .5) + words(show?.[2]?.text || '') / (c.cfg.direction?.readingWordsPerSecond || 3)) : thresholds.frozenSeconds;
+        readingSeconds(show?.[2]?.text || '', c.cfg)) : thresholds.frozenSeconds;
       limit = target + 1;
     }
     if (s.sec - s.frozenSince > limit) problems.push(makeProblem(c.take, 'frozen', 'warning', s.frozenSince, `same rendered frame persists for ${s.sec - s.frozenSince}s`, s.segment, s.sec));

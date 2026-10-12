@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { words } from './lint.mjs';
+import { readingSeconds } from '../post/fit.mjs';
 import { parseTarget } from './target.mjs';
 
 const QUOTED = /^(?:text|row|line|role|label|css)\s+/;
@@ -293,7 +294,7 @@ export async function perform(h, beat, code = {}) {
   if (show) h.log('show', show);
   const policy = h.config.direction || {};
   const narration = words(beat.say) / (h.config.voiceover?.wordsPerSecond || 2.5);
-  const reading = (policy.readingBase ?? 0.5) + words(show?.text) / (policy.readingWordsPerSecond ?? 3);
+  const reading = readingSeconds(show?.text, h.config);
   const holdMs = h.rehearsal ? 300 : (Math.max(narration, reading, policy.minHold ?? 1.5) * (policy.captureHold ?? 1.5) + 1) * 1000;
   h.log('hold', { beat: beat.id });
   try { await h.sleep(holdMs); }

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { segments, smooth, view_track, box_at, windows, speed_tag, beat_plan, captionPieces } from '../src/post/logic.mjs';
 import { runs, perspectiveExpressions } from '../src/post/render.mjs';
-import { directCamera, fitSegment, fitTargets, motionIntervals } from '../src/post/fit.mjs';
+import { directCamera, fitSegment, fitTargets, motionIntervals, readingSeconds } from '../src/post/fit.mjs';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'vectors');
 const read = (name) => JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8'));
@@ -360,4 +360,11 @@ test('ffmpeg fits held storyboard pieces and rejects an animated still cut', { t
       { targets: { held: 2 }, unstable: { held: [{ a: 1, b: 9 }] } });
     assert.ok(plan.beats.slice(1).every((b, i) => !(plan.beats[i].b < 9 && b.a > 1 && b.a - plan.beats[i].b > 1e-8)));
   } finally { fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+});
+
+test('reading time grows with the target text and is capped: a paragraph is glanced at, not read through', () => {
+  assert.equal(readingSeconds('Saved'), 0.5 + 1 / 3);
+  assert.equal(readingSeconds('Format conformance score: 100/100'), 0.5 + 5 / 3);
+  assert.equal(readingSeconds(Array(40).fill('word').join(' ')), 4);
+  assert.equal(readingSeconds(Array(40).fill('word').join(' '), { direction: { readingMax: 6 } }), 6);
 });
