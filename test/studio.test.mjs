@@ -13,6 +13,7 @@ import { validateAudio, validateBrief, validateProduct, validateStoryboard, vali
 import { compile } from '../src/studio/compile.mjs';
 import { parseTarget } from '../src/studio/target.mjs';
 import { enter, perform } from '../src/studio/runtime.mjs';
+import { confirmBeat, confirmationStatus, currentConfirmation, quotedPhrases } from '../src/studio/confirm.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'bin', 'ghostcast.mjs');
@@ -159,6 +160,69 @@ test('next walks init, understand, brief, storyboard, lint, rehearse, approve an
   assert.equal(report.warnings, 1);
   assert.ok(report.problems.some((problem) => /small text/.test(problem.message)));
   assert.match(cli(dir, 'next').stdout, /^shoot · .*\n  ! finish\s+warning: small text/);
+});
+
+test('confirm checks every quoted phrase against page facts and the show target', (t) => {
+  const { dir, studio } = init(t);
+  const raw = path.join(studio, 'raw', 'storyboard'); fs.mkdirSync(raw, { recursive: true });
+  const events = [[0, 'registry'], [100, '+registry'], [200, 'show', { text: 'Release Notes', rect: {} }],
+    [300, 'facts', { text: 'Search for release notes. First result: release-notes-649bc42f.', boxes: [] }], [400, '-registry']];
+  const log = path.join(raw, 'log.json'); fs.writeFileSync(log, JSON.stringify(events));
+  assert.deepEqual(quotedPhrases('The first result is “release-notes-649bc42f”, under `release notes`.'), ['release-notes-649bc42f', 'release notes']);
+  assert.equal(confirmationStatus(studio, 'registry', 'The result is "RELEASE-notes-649bc42f" under " release   NOTES ".').ok, true);
+  assert.throws(() => confirmBeat(studio, 'registry', 'It says "missing phrase".'), /phrase “missing phrase” was not found/);
+  assert.throws(() => confirmBeat(studio, 'registry', 'The result looks good.'), /quote at least one phrase/);
+  fs.writeFileSync(log, JSON.stringify(events.map((event) => event[1] === 'show' ? [event[0], event[1], { text: 'target only', rect: {} }] : event)));
+  assert.throws(() => confirmBeat(studio, 'registry', 'It shows "release-notes-649bc42f" and searches for `release notes`.'), /no quoted phrase was found in the show target/);
+  fs.writeFileSync(log, JSON.stringify(events));
+  assert.throws(() => confirmBeat(studio, 'registry', 'The first result is "release-notes-649bc42f".'), /no quoted phrase was found in the show target/);
+  // Quoting a letter or two, or a scrap of the target, does not show the page was read.
+  assert.throws(() => confirmBeat(studio, 'registry', 'It says "Re".'), /too short to show the page was read/);
+  assert.throws(() => confirmBeat(studio, 'registry', 'It shows "Notes" and the result "release-notes-649bc42f".'), /too little of the show target/);
+  assert.throws(() => confirmBeat(studio, 'registry', 'The target says “Release Notes” but also shows “unknown”.'), /look at the sheet again/);
+  const accepted = confirmBeat(studio, 'registry', 'The target says “Release Notes” and the result is `release-notes-649bc42f`.');
+  assert.match(accepted.message, /^confirmed registry:/);
+  assert.equal(currentConfirmation(studio, 'storyboard', 'registry'), true);
+  fs.writeFileSync(log, JSON.stringify([...events, [350, 'facts', { text: 'new log', boxes: [] }]]));
+  assert.equal(currentConfirmation(studio, 'storyboard', 'registry'), false, 'a changed log invalidates the saved hash');
+});
+
+test('confirm refuses a take with no logged page facts', (t) => {
+  const { studio } = init(t);
+  const raw = path.join(studio, 'raw', 'storyboard'); fs.mkdirSync(raw, { recursive: true });
+  fs.writeFileSync(path.join(raw, 'log.json'), JSON.stringify([[0, '+registry'], [100, 'show', { text: 'Ready' }], [200, '-registry']]));
+  assert.throws(() => confirmBeat(studio, 'registry', 'It says "Ready".'), /no logged page facts, so its text cannot be checked/);
+  assert.ok(!fs.existsSync(path.join(studio, 'confirmations.json')));
+});
+
+test('next continues through shoot, check, confirm and done for a hand-built current cut', (t) => {
+  const { dir, studio } = init(t);
+  const story = { ...sampleStory, video: 'demo', weight: 'standard' };
+  writeStory(studio, story);
+  assert.equal(cli(dir, 'approve', 'storyboard').status, 0);
+  const hash = storyboardHash(studio), raw = path.join(studio, 'raw', 'storyboard');
+  writeRehearsal(studio, { storyboardHash: hash, runs: 3, partial: false, beats: [{ id: 'result', status: 'pass', passes: 3, reached: 3, errors: [], warnings: [] }] });
+  let report = nextJson(dir); assert.equal(report.stage, 'shoot');
+  fs.mkdirSync(raw, { recursive: true }); fs.mkdirSync(path.join(studio, 'clips'), { recursive: true });
+  fs.mkdirSync(path.join(studio, 'out'), { recursive: true }); fs.mkdirSync(path.join(studio, 'cache'), { recursive: true });
+  fs.writeFileSync(path.join(raw, 'source.json'), JSON.stringify({ storyboardHash: hash }));
+  fs.writeFileSync(path.join(raw, 'log.json'), JSON.stringify([[0, '+result'], [100, 'show', { text: 'Ready' }], [150, 'facts', { text: 'Ready to launch', boxes: [] }], [200, '-result']]));
+  const meta = path.join(studio, 'clips', 'storyboard.json'); fs.writeFileSync(meta, JSON.stringify({ duration: 1, segments: [{ segment: 'result', start: 0, end: 1 }] }));
+  fs.writeFileSync(path.join(studio, 'clips', 'storyboard.mp4'), 'clip');
+  fs.writeFileSync(path.join(studio, 'out', 'demo-silent.mp4'), 'silent');
+  const newer = new Date(Date.now() + 3000);
+  for (const file of [meta, path.join(studio, 'clips', 'storyboard.mp4'), path.join(studio, 'out', 'demo-silent.mp4')]) fs.utimesSync(file, newer, newer);
+  report = nextJson(dir); assert.equal(report.stage, 'check');
+  const check = { problems: [], errors: 0, warnings: 1, cut: { storyboard: crypto.createHash('sha256').update(fs.readFileSync(meta)).digest('hex') } };
+  fs.writeFileSync(path.join(studio, 'cache', 'checks.json'), JSON.stringify({ ...check, errors: 1, problems: [{ check: 'small-text', level: 'error', take: 'storyboard', segment: 'result', message: 'text is small' }] }));
+  report = nextJson(dir); assert.equal(report.stage, 'check'); assert.match(report.next, /shoot again, then run `ghostcast check`/);
+  fs.writeFileSync(path.join(studio, 'cache', 'checks.json'), JSON.stringify(check));
+  report = nextJson(dir); assert.equal(report.stage, 'confirm', JSON.stringify(report)); assert.match(report.next, /ghostcast review beats/);
+  const clipJson = fs.readFileSync(meta, 'utf8'); fs.writeFileSync(meta, `${clipJson} `);
+  assert.equal(nextJson(dir).stage, 'check', 'the cached checks no longer match changed clip metadata');
+  fs.writeFileSync(meta, clipJson);
+  assert.equal(confirmBeat(studio, 'result', 'It says “Ready”.').message.startsWith('confirmed result:'), true);
+  report = nextJson(dir); assert.equal(report.stage, 'done', JSON.stringify(report)); assert.equal(report.next, 'out/demo-silent.mp4'); assert.equal(report.warnings, 1);
 });
 
 test('next reopens approval for changed beats and identifies mechanics-only changes', (t) => {

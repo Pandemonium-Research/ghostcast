@@ -2,8 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
-import { ffmpeg } from './render.mjs';
+import { ffmpeg, probeSize } from './render.mjs';
 import { loadProject } from '../project.mjs';
+import { beat_plan } from './logic.mjs';
+import { fitTargets } from './fit.mjs';
 
 const json = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const exists = (p) => fs.existsSync(p);
@@ -50,9 +52,54 @@ async function sheet(root, cfg, entries, title, dest) {
 
 export async function review(root, args) {
   const target = args[0];
-  if (!target) throw new Error('usage: ghostcast review <take|final> [--raw] [--at seconds] [--every seconds]');
+  if (!target) throw new Error('usage: ghostcast review <take|final|beats> [--raw] [--at seconds] [--every seconds]');
   const cfg = loadProject(root).config;
   const out = path.join(root, 'out', 'review'); fs.mkdirSync(out, { recursive: true });
+  if (target === 'beats') {
+    const timeline = json(path.join(root, 'timeline.json'));
+    const storyFile = path.join(root, 'storyboard.yaml');
+    const story = exists(storyFile) ? (await import('../studio/schema.mjs')).parseYaml(fs.readFileSync(storyFile, 'utf8'), 'storyboard.yaml').data : null;
+    const claims = new Map((story?.beats || []).map((beat) => [beat.id, beat]));
+    const destination = path.join(out, 'beats'); fs.mkdirSync(destination, { recursive: true });
+    const paths = [];
+    for (const item of timeline.items || []) {
+      const take = item.take, raw = path.join(root, 'raw', take), video = path.join(root, 'clips', `${take}.mp4`);
+      if (!exists(video) || !exists(path.join(raw, 'log.json')) || !exists(path.join(raw, 'frames.json'))) continue;
+      const log = json(path.join(raw, 'log.json')), frames = json(path.join(raw, 'frames.json'));
+      const firstFrame = path.join(raw, 'frames', frames[0][1]);
+      const [srcW, srcH] = probeSize(firstFrame), fitted = fitTargets(root, take, log, cfg);
+      const planned = beat_plan(log, frames, cfg, srcW, srcH, { targets: fitted.targets, readings: fitted.readings });
+      const meta = clipMeta(root, take), sourceSegments = log.filter((event) => /^[+-]/.test(event[1]));
+      const sourceStarts = new Map(sourceSegments.filter((event) => event[1][0] === '+').map((event) => [event[1].slice(1), event[0] / 1000]));
+      const sourceEnds = new Map(sourceSegments.filter((event) => event[1][0] === '-').map((event) => [event[1].slice(1), event[0] / 1000]));
+      const toOutput = (segment, source) => {
+        const part = planned.beats.find((beat) => beat.segment === segment && source >= beat.a - .01 && source <= beat.b + .01);
+        if (part) return part.start + Math.max(0, source - part.a) / (part.speed || 1);
+        const rawStart = sourceStarts.get(segment), rawEnd = sourceEnds.get(segment), output = meta.segments.find((entry) => entry.segment === segment);
+        return output ? output.start + ((source - rawStart) / Math.max(.001, rawEnd - rawStart)) * (output.end - output.start) : 0;
+      };
+      for (const segment of meta.segments) {
+        const rawStart = sourceStarts.get(segment.segment), rawEnd = sourceEnds.get(segment.segment);
+        if (rawStart == null || rawEnd == null) continue;
+        const beat = claims.get(segment.segment);
+        const show = log.filter((event) => event[1] === 'show' && event[0] / 1000 >= rawStart && event[0] / 1000 <= rawEnd).at(-1);
+        const sourceTimes = [rawStart + .1, show ? show[0] / 1000 : (rawStart + rawEnd) / 2, rawEnd - .1];
+        const times = sourceTimes.map((source) => Math.max(segment.start, Math.min(segment.end - .04, toOutput(segment.segment, source))));
+        const entries = [];
+        for (const time of times) {
+          const still = path.join(destination, `.${take}-${segment.segment}-${time.toFixed(3)}.png`);
+          await ffmpeg(['-ss', time.toFixed(3), '-i', video, '-frames:v', '1', '-y', still]);
+          entries.push([still, `${take} · ${segment.segment} · ${time.toFixed(1)}s`]);
+        }
+        const title = beat?.claim || beat?.show || segment.segment;
+        const dest = path.join(destination, `${take}-${segment.segment}.png`);
+        try { await sheet(root, cfg, entries, title, dest); paths.push(dest); }
+        finally { for (const [file] of entries) { try { fs.unlinkSync(file); } catch {} } }
+      }
+    }
+    if (!paths.length) throw new Error('no cut segments found (run `ghostcast all` first)');
+    return paths;
+  }
   if (args.includes('--raw')) {
     const raw = path.join(root, 'raw', target), frames = json(path.join(raw, 'frames.json'));
     const logFile = path.join(raw, 'log.json'), log = exists(logFile) ? json(logFile) : [];

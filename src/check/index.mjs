@@ -107,7 +107,10 @@ function factsChecks(c, problems, thresholds) {
   const minText = thresholds.minTextPx;
   for (const [ms, , data] of facts) {
     const source = ms / 1000, { at, segment } = outputAt(c, source);
-    const view = c.plan.keys.length ? box_at(c.plan.keys, source) : [0, 0, c.srcW, c.srcH];
+    // "Too small once zoomed": facts logged as the camera starts a move are judged at the framing
+    // it moves to, not at the view it is leaving.
+    const move = c.plan.keys.findLast(([tk]) => tk <= source + .05 && source < tk + .75);
+    const view = c.plan.keys.length ? box_at(c.plan.keys, move ? move[0] + .75 : source) : [0, 0, c.srcW, c.srcH];
     const scale = c.cfg.output.width / Math.max(1, view[2]);
     const small = (data.boxes || []).filter((b) => Number(b.px) * c.dpr * scale < minText);
     if (small.length > (data.boxes || []).length / 2 && small.length)
@@ -143,12 +146,14 @@ function factsChecks(c, problems, thresholds) {
     if (beat.show && !show) problems.push(makeProblem(c.take, 'show-visible', 'error', seg?.start || 0, `show target for beat ${name} never appeared`, name));
     if (beat.show && seg) {
       const hold = c.log.filter((e) => e[1] === 'hold' && e[2]?.beat === name).at(-1);
-      const end = hold ? c.log.find((e) => e[1] === 'holdend' && e[0] > hold[0]) : null;
-      const post = seg.pieces?.at(-1);
-      const duration = post ? post.end - post.start : seg.end - seg.start;
+      // The hold as the cut shows it: fitting may split it around a removed stretch, so add up
+      // what each piece keeps of it. A tenth of a second covers rounding to whole frames.
+      // The hold ends the beat, so the segment's closing margin still shows the same picture.
+      const from = hold ? hold[0] / 1000 : src.a, to = src.b;
+      const duration = c.plan.beats.filter((b) => b.segment === name)
+        .reduce((sum, b) => sum + Math.max(0, Math.min(b.b, to) - Math.max(b.a, from)) / (b.speed || 1), 0);
       const need = (c.cfg.direction?.readingBase ?? .5) + words(show?.[2]?.text) / (c.cfg.direction?.readingWordsPerSecond || 3);
-      if (duration < need) problems.push(makeProblem(c.take, 'show-visible', 'error', seg.start, `post-framing hold is ${duration.toFixed(1)}s; target needs ${need.toFixed(1)}s`, name, seg.end));
-      void end;
+      if (duration < need - .1) problems.push(makeProblem(c.take, 'show-visible', 'error', seg.start, `the hold on the show target is ${duration.toFixed(1)}s; reading it needs ${need.toFixed(1)}s`, name, seg.end));
     }
     if (seg) {
       const narr = words(beat.say || '') / (c.cfg.voiceover?.wordsPerSecond || 2.5);
@@ -346,6 +351,11 @@ export function writeCheckReport(root, report, customPath = null) {
   const jsonPath = customPath ? `${base}.json` : path.join(root, 'cache', 'checks.json');
   fs.mkdirSync(path.dirname(base), { recursive: true }); fs.mkdirSync(path.dirname(jsonPath), { recursive: true });
   fs.writeFileSync(base, `# ghostcast check\n\n${formatCheck(report)}`, 'utf8');
+  const timeline = read(path.join(root, 'timeline.json'), { items: [] });
+  report.cut = Object.fromEntries((timeline.items || []).map(({ take }) => {
+    const file = path.join(root, 'clips', `${take}.json`);
+    return [take, fs.existsSync(file) ? sha(fs.readFileSync(file)) : null];
+  }));
   fs.writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   return { report: base, json: jsonPath };
 }

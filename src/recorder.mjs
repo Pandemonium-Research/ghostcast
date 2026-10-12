@@ -12,6 +12,7 @@
 //   frames.json         [[epoch_seconds, "NNNNNN.jpg"], ...]
 //   log.json            [[epoch_ms, label, data?], ...]: +name/-name segments, focus/unfocus, viewport
 import { chromium } from 'playwright';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -163,11 +164,14 @@ export function makeHelpers(project, page, log, world = null) {
       }
     },
 
+    // Paced by the clock: on a loaded machine a key can take 100 ms to send, and waiting the full
+    // gap after it as well would type at a third of the pace asked for.
     async type(text, { cps = 17 } = {}) {
       for (const ch of text) {
+        const sent = Date.now();
         if (ch === '\n') await page.keyboard.press('Enter');
         else await page.keyboard.type(ch);
-        await sleep(jitter(1000 / cps));
+        await sleep(Math.max(0, jitter(1000 / cps) - (Date.now() - sent)));
       }
     },
     press: (key) => page.keyboard.press(key),
@@ -567,6 +571,11 @@ export async function record(project, sceneFile, take, { headed = false, world =
       await sleep(800);
       const frames = await stop();
       fs.writeFileSync(path.join(dir, 'log.json'), JSON.stringify(log, null, 1));
+      const storyboardFile = path.join(project.root, 'storyboard.yaml');
+      if (take === 'storyboard' && fs.existsSync(path.join(project.root, 'product.md')) && fs.existsSync(storyboardFile)) {
+        const storyboard = fs.readFileSync(storyboardFile, 'utf8').replace(/\r\n/g, '\n');
+        fs.writeFileSync(path.join(dir, 'source.json'), `${JSON.stringify({ storyboardHash: crypto.createHash('sha256').update(storyboard).digest('hex') }, null, 2)}\n`);
+      }
       const segs = log.filter((e) => /^[+-]/.test(e[1])).length / 2;
       console.log(`${take}: ${frames} frames, ${segs} segments${ok ? '' : ' (scene failed)'} -> ${dir}`);
     }

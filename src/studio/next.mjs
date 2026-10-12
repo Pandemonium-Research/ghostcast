@@ -1,14 +1,53 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { lint } from './lint.mjs';
 import { storyboardHash } from './approve.mjs';
 import { parseYaml, readBrief, validateBrief, validateProduct } from './schema.mjs';
+import { currentConfirmation } from './confirm.mjs';
 
 const result = (stage, state, next, problems = [], warnings = 0) => ({ stage, state, problems, next, warnings });
 const read = (file) => fs.readFileSync(file, 'utf8');
 const warningSuffix = (count) => count ? `, ${count} warning${count === 1 ? '' : 's'}` : '';
 const issue = (problem) => ({ ...(problem.id ? { id: problem.id } : {}), message: `${problem.path ? `${problem.path}: ` : ''}${problem.message}` });
+const fileHash = (file) => fs.existsSync(file) ? crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
+
+function postShoot(dir, story, currentHash, warnings, rehearsalProblems = []) {
+  const take = 'storyboard', raw = path.join(dir, 'raw', take), log = path.join(raw, 'log.json');
+  const source = path.join(raw, 'source.json'), clipMeta = path.join(dir, 'clips', `${take}.json`);
+  const clipVideo = path.join(dir, 'clips', `${take}.mp4`);
+  const silent = path.join(dir, 'out', `${story.video || 'screencast'}-silent.mp4`);
+  let sourceHash;
+  try { sourceHash = JSON.parse(read(source)).storyboardHash; } catch {}
+  const rawMtime = fs.existsSync(log) ? fs.statSync(log).mtimeMs : Infinity;
+  const fresh = (file) => fs.existsSync(file) && fs.statSync(file).mtimeMs > rawMtime;
+  const shot = sourceHash === currentHash && fs.existsSync(log) && fs.existsSync(clipMeta) && fs.existsSync(clipVideo)
+    && fresh(clipMeta) && fresh(clipVideo) && fresh(silent);
+  if (!shot) return result('shoot', 'the approved storyboard has not been shot and assembled yet', 'shoot it with `ghostcast all`', rehearsalProblems, warnings);
+
+  let checks;
+  try { checks = JSON.parse(read(path.join(dir, 'cache', 'checks.json'))); } catch {}
+  const timeline = (() => { try { return JSON.parse(read(path.join(dir, 'timeline.json'))); } catch { return { items: [{ take }] }; } })();
+  const currentCut = Object.fromEntries((timeline.items || []).map((item) => [item.take, fileHash(path.join(dir, 'clips', `${item.take}.json`))]));
+  const cutIsCurrent = isDeepStrictEqual(checks?.cut, currentCut) && checks?.cut?.[take] === fileHash(clipMeta);
+  const checkWarnings = (checks?.problems || []).filter((problem) => problem.level === 'warning')
+    .map((problem) => ({ id: problem.segment || problem.take, message: `warning: ${problem.check}: ${problem.message}` }));
+  if (!cutIsCurrent || checks.errors > 0) {
+    const errors = (checks?.problems || []).filter((problem) => problem.level === 'error');
+    const problems = errors.slice(0, 8).map((problem) => ({ id: problem.segment || problem.take, message: `${problem.check}: ${problem.message}` }));
+    if (errors.length > 8) problems.push({ message: `and ${errors.length - 8} more` });
+    if (!cutIsCurrent && !errors.length) problems.push({ message: 'checks are missing or for an older cut' });
+    return result('check', checks?.errors ? `${checks.errors} check error${checks.errors === 1 ? '' : 's'}${warningSuffix(checks.warnings || 0)}` : 'checks are missing or stale',
+      checks?.errors ? 'fix these, shoot again, then run `ghostcast check`' : 'run `ghostcast check` for the current cut', [...problems, ...checkWarnings], checks?.warnings || warnings);
+  }
+
+  const beats = story.beats.map((beat) => beat.id).filter((id) => !currentConfirmation(dir, take, id));
+  if (beats.length) return result('confirm', `${beats.length} beat${beats.length === 1 ? '' : 's'} need confirmation${warningSuffix(checks.warnings || 0)}`,
+    'run ghostcast review beats, look at each sheet, and confirm what it shows: ' + beats.map((id) => 'ghostcast confirm ' + id + ' "…"').join(', '),
+    [...beats.map((id) => ({ id, message: 'needs confirmation for the current take' })), ...checkWarnings], checks.warnings || warnings);
+  return result('done', `the silent cut is ready; voice comes next${warningSuffix(checks.warnings || 0)}`, `out/${story.video || 'screencast'}-silent.mp4`, checkWarnings, checks.warnings || warnings);
+}
 
 function lintIssue(problem) {
   const location = `${problem.file}${problem.line ? `:${problem.line}` : ''}${problem.path ? ` ${problem.path}` : ''}${problem.id ? ` (${problem.id})` : ''}`;
@@ -117,7 +156,7 @@ export function next(dir) {
   const approvalFile = path.join(dir, 'approvals.json');
   let approvedHash;
   try { approvedHash = JSON.parse(read(approvalFile))?.storyboard?.sha256; } catch {}
-  if (approvedHash === currentHash) return rehearsed;
+  if (approvedHash === currentHash) return postShoot(dir, story, currentHash, rehearsed.warnings, rehearsed.problems);
   const approvedCopy = path.join(dir, 'cache', 'approved', 'storyboard.yaml');
   const changes = approvedHash && fs.existsSync(approvedCopy) ? storyboardChanges(read(approvedCopy), read(storyboardFile)) : { problems: [] };
   const estimate = lintReport.estimate;
@@ -127,10 +166,10 @@ export function next(dir) {
 }
 
 export function formatNext(report) {
-  const lines = [`${report.stage} · ${report.state}`];
+  const lines = [`${report.stage} \u00b7 ${report.state}`];
   for (const problem of report.problems) {
     if (problem.message.startsWith('and ') && !problem.id) { lines.push(`  ${problem.message}`); continue; }
-    lines.push(`  ${problem.message.startsWith('warning:') ? '!' : '✗'} ${problem.id && !/^(?:error|warning)\s{2}/.test(problem.message) ? `${problem.id.padEnd(8)} ` : ''}${problem.message}`);
+    lines.push(`  ${problem.message.startsWith('warning:') ? '!' : '\u2717'} ${problem.id && !/^(?:error|warning)\s{2}/.test(problem.message) ? `${problem.id.padEnd(8)} ` : ''}${problem.message}`);
   }
   lines.push(`next: ${report.next}`);
   return lines.join('\n');

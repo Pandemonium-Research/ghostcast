@@ -26,6 +26,7 @@ const HELP = `ghostcast — a recording studio for coding agents
   ghostcast check [--report <file>] [--json] check the current assembled cut
   ghostcast approve storyboard          record approval of the lint-clean storyboard
   ghostcast next [--json]               report the first unfinished studio stage and next action
+  ghostcast confirm <beat> "<what you see>" check a beat against its logged page text
   ghostcast compile                     generate cache/storyboard.mjs and timeline.json
   ghostcast rehearse [beat ids...] [--runs 3] [--headed]
                                         dry run beats without capture and report flakiness
@@ -41,7 +42,7 @@ const HELP = `ghostcast — a recording studio for coding agents
   ghostcast all [<take> ...] [--keep-world]
                                         record + cut each take (one retry), then assemble
   ghostcast assemble                    clips + captions → out/<name>-silent.mp4 + cue sheet
-  ghostcast review <take|final> [--raw] [--at <s>] [--every <s>]
+  ghostcast review <take|final|beats> [--raw] [--at <s>] [--every <s>]
                                         contact sheets and stills under out/review/
 
   ghostcast vo-script                   narration blocks timed against the cut → out/voiceover-script.md
@@ -266,6 +267,15 @@ const commands = {
     const { next, formatNext } = await import('../src/studio/next.mjs');
     const report = next(studioDir());
     console.log(json ? JSON.stringify(report, null, 2) : formatNext(report));
+  },
+
+  async confirm() {
+    if (argv.length !== 2) die('usage: ghostcast confirm <beat> "<what you see>"');
+    const { confirmBeat } = await import('../src/studio/confirm.mjs');
+    try {
+      const answer = confirmBeat(projectDir, argv[0], argv[1], { studio: fs.existsSync(path.join(projectDir, 'project.json')) ? projectDir : studioDir() });
+      console.log(answer.message);
+    } catch (error) { die(error.message); }
   },
 
   async compile() {

@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { checkTake, formatCheck } from '../src/check/index.mjs';
+import { checkTake, formatCheck, writeCheckReport } from '../src/check/index.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const template = JSON.parse(fs.readFileSync(path.join(here, '../templates/project/project.json'), 'utf8'));
@@ -111,6 +112,15 @@ test('pure: ghostcast check writes a report for a synthetic page-facts fixture',
   if (process.env.GHOSTCAST_PRINT_FIXTURE_REPORT) process.stdout.write(report);
 });
 
+test('pure: checks.json records the cut file hashes used by the report', () => {
+  const root = fixture();
+  const clip = path.join(root, 'clips', 'alpha.json'); fs.writeFileSync(clip, '{"duration":1}');
+  const report = { problems: [], errors: 0, warnings: 0, takes: ['alpha'] };
+  writeCheckReport(root, report);
+  const saved = JSON.parse(fs.readFileSync(path.join(root, 'cache', 'checks.json'), 'utf8'));
+  assert.equal(saved.cut.alpha, crypto.createHash('sha256').update(fs.readFileSync(clip)).digest('hex'));
+});
+
 test('ffmpeg pixels: white frames with small text trigger empty, small text and caption-over; zoom passes', async () => {
   const make = (zoom) => {
     const root = fixture({ config: { viewport: { width: 960, height: 540, dpr: 1 }, output: { width: 1920, height: 1080, fps: 2 } },
@@ -149,4 +159,30 @@ test('Chrome: a recorded take logs page facts and ghostcast check passes', { tim
   const checked = spawnSync(node, [cli, 'check', '--project', root], { encoding: 'utf8', timeout: 150_000 });
   assert.equal(checked.status, 0, checked.stderr || checked.stdout);
   assert.match(checked.stdout, /0 errors, 0 warnings/);
+});
+
+test('Chrome + ffmpeg: a recorded storyboard gets beat sheets and checkable confirmations', { timeout: 240_000 }, async (t) => {
+  const root = fixture();
+  const studio = path.join(root, '.ghostcast'); fs.mkdirSync(studio, { recursive: true });
+  const html = '<!doctype html><meta charset="utf-8"><style>body{font:32px Arial;padding:80px;background:#eef}</style><h1>Logged result: release-notes-649bc42f</h1><p>Search: release notes</p>';
+  fs.writeFileSync(path.join(root, 'index.html'), html);
+  fs.writeFileSync(path.join(studio, 'product.md'), '# Fixture\n');
+  fs.writeFileSync(path.join(studio, 'storyboard.yaml'), `video: sample\nweight: standard\ntype: how-to\ncap: 100\nbeats:\n  - id: registry\n    surface: web\n    open: index.html\n    show: 'text "Logged result: release-notes-649bc42f"'\n    claim: The first result is visible.\n    say: The registry shows its first result.\n  - id: query\n    surface: web\n    show: 'text "Search: release notes"'\n    say: The search text stays visible.\n`);
+  const cli = path.join(here, '../bin/ghostcast.mjs'), node = process.execPath;
+  const all = spawnSync(node, [cli, 'all', '--project', studio], { encoding: 'utf8', timeout: 210_000 });
+  assert.equal(all.status, 0, all.stderr || all.stdout);
+  const source = JSON.parse(fs.readFileSync(path.join(studio, 'raw', 'storyboard', 'source.json'), 'utf8'));
+  assert.match(source.storyboardHash, /^[a-f0-9]{64}$/);
+  const review = spawnSync(node, [cli, 'review', 'beats', '--project', studio], { encoding: 'utf8', timeout: 90_000 });
+  assert.equal(review.status, 0, review.stderr || review.stdout);
+  const sheet = path.join(studio, 'out', 'review', 'beats', 'storyboard-registry.png');
+  assert.ok(fs.existsSync(sheet));
+  assert.deepEqual(fs.readdirSync(path.dirname(sheet)).filter((name) => name.endsWith('.png')).sort(), ['storyboard-query.png', 'storyboard-registry.png']);
+  const wrong = spawnSync(node, [cli, 'confirm', 'registry', 'The result is "not on the page".', '--project', studio], { encoding: 'utf8' });
+  assert.equal(wrong.status, 1); assert.match(wrong.stderr, /not found in page text.*look at the sheet again/);
+  assert.ok(!fs.existsSync(path.join(studio, 'confirmations.json')));
+  const right = spawnSync(node, [cli, 'confirm', 'registry', 'The result is "release-notes-649bc42f" under `release notes`.', '--project', studio], { encoding: 'utf8' });
+  assert.equal(right.status, 0, right.stderr || right.stdout);
+  assert.match(right.stdout, /confirmed registry/);
+  assert.ok(fs.existsSync(path.join(studio, 'confirmations.json')));
 });

@@ -31,7 +31,11 @@ export function parseYaml(source, file, lineOffset = 0) {
     const pos = node?.range?.[0];
     return pos === undefined ? undefined : lineCounter.linePos(pos).line + lineOffset;
   };
-  const problems = doc.errors.map((error) => ({ file, path: '', line: error.pos?.[0] === undefined ? undefined : lineCounter.linePos(error.pos[0]).line + lineOffset, message: `invalid YAML: ${error.message}` }));
+  // The commonest slip in a storyboard: a value holding ": " (a show target, a line of narration)
+  // or text after a closing quote must be quoted whole. YAML's own message does not say so.
+  const hint = (message) => /Nested mappings are not allowed|Implicit keys need to be on a single line|Unexpected scalar at node end|Implicit map keys need to be followed/.test(message)
+    ? `${message}\nA value that contains ": " or continues after a quote must be quoted whole, for example show: 'text "Saved: 3 files"'.` : message;
+  const problems = doc.errors.map((error) => ({ file, path: '', line: error.pos?.[0] === undefined ? undefined : lineCounter.linePos(error.pos[0]).line + lineOffset, message: `invalid YAML: ${hint(error.message)}` }));
   let data = null;
   try { data = doc.toJS(); } catch (error) { problems.push({ file, path: '', message: `invalid YAML: ${error.message}` }); }
   return { data, doc, problems, line };
