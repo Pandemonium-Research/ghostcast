@@ -43,7 +43,7 @@
   "workbench.panel.opensMaximized": "always",
   "chat.agent.enabled": false,
   "workbench.editor.empty.hint": "hidden",
-  "workbench.editor.labelFormat": "short",
+  "workbench.editor.labelFormat": "default",
   "editor.renderLineHighlight": "none",
   "editor.cursorBlinking": "solid"
 }

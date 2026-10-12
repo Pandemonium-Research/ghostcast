@@ -424,6 +424,7 @@ function vscodeHelpers(h) {
       // serve-web takes a Windows folder as /c:/Users/…
       const folderPath = path.resolve(h.world?.dir || h.project.root, folder || '.');
       assertOutsideSource(folderPath, h.world?.source);
+      v.folder = folderPath;
       const abs = folderPath.replace(/\\/g, '/');
       const param = /^[A-Za-z]:\//.test(abs) ? '/' + abs[0].toLowerCase() + abs.slice(1) : abs;
       const url = `${cfg.url || 'http://127.0.0.1:8765'}/?tkn=${token}&folder=${encodeURIComponent(param)}`;
@@ -482,13 +483,27 @@ function vscodeHelpers(h) {
     // editor it selects a line instead.
     async clearTerm() { await v.command('Terminal: Clear'); await sleep(300); },
 
+    // Quick Open is given the file's absolute path: a relative one is matched fuzzily against the
+    // search index, which leaves out git-ignored files, so a generated tasks.json opened as
+    // tasks.seed.json. What opened is checked, so a take never films the wrong file.
     async openFile(rel) {
+      const file = path.resolve(v.folder || h.world?.dir || h.project.root, rel);
+      const isOpen = () => page.evaluate((want) => [...document.querySelectorAll('.editor-group-container .monaco-editor[data-uri]')]
+        .some((el) => decodeURIComponent(el.getAttribute('data-uri')).replace(/\\/g, '/').toLowerCase().endsWith(want)),
+      file.replace(/\\/g, '/').toLowerCase());
       await page.keyboard.press('Control+p');
       await page.waitForSelector('.quick-input-widget input', { state: 'visible', timeout: 10000 });
-      await page.keyboard.type(rel);
-      await sleep(700);
+      await page.keyboard.type(file);
+      await page.waitForFunction((name) => [...document.querySelectorAll('.quick-input-list .monaco-list-row')]
+        .some((row) => row.textContent.includes(name)), path.basename(file), { timeout: 5000 }).catch(() => {});
+      await sleep(300);
       await page.keyboard.press('Enter');
-      await sleep(900);
+      const start = Date.now();
+      while (!(await isOpen())) {
+        if (Date.now() - start > 5000) throw new Error(`vscode.openFile: ${rel} did not open (${file})`);
+        await sleep(150);
+      }
+      await sleep(600);
     },
     // Keyboard focus into an editor, counted top to bottom, then left to right (by its on-screen
     // box — .view-lines moves with scrolling and cannot be used to order or click editors).

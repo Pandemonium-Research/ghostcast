@@ -78,7 +78,7 @@ to. Focus the heading, the line, or the row.
 | Call | What it does |
 |---|---|
 | `await h.vscode.command('View: Split Editor Down')` | Runs any command through the palette (F1). Prefer this to keybindings: with the terminal focused, many keys go to the shell. |
-| `await h.vscode.openFile('src/app.ts')` | Quick Open (Ctrl+P). |
+| `await h.vscode.openFile('src/app.ts')` | Opens a file in the open folder through Quick Open (Ctrl+P), git-ignored ones included, and fails if a different file opened. |
 | `await h.vscode.gotoLine('42', {editor})` | Go to Line in an editor. Editors count top to bottom, then left to right. |
 | `await h.vscode.focusEditor(i)` | Gives keyboard focus to editor `i`. |
 | `await h.vscode.resizePanel(px)` | Sets the bottom panel's height (terminal below, editor above). |
