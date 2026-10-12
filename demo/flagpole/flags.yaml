@@ -1,0 +1,14 @@
+# Feature flags for the Roastery shop.
+# flagpole reads and writes this file; commit it like code.
+
+new-checkout:
+  description: One-tap express checkout
+  rollout: 0%
+
+dark-mode:
+  description: Dark theme for the storefront
+  rollout: 100%
+
+search-v2:
+  description: Typo-tolerant product search
+  rollout: 25%

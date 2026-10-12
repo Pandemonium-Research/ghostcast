@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flags · flagpole</title>
+<style>
+  :root { --ink: #0f172a; --muted: #64748b; --faint: #94a3b8; --line: #e2e8f0; --bg: #f8fafc; --green: #10b981; --green-ink: #047857; --green-soft: #d1fae5; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 18px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--bg); }
+  header { display: flex; align-items: center; gap: 12px; height: 64px; padding: 0 36px; background: var(--ink); color: #fff; }
+  .logo { width: 32px; height: 32px; border-radius: 9px; background: var(--green); display: grid; place-items: center; }
+  .brand { font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
+  .project { margin-left: 18px; padding-left: 18px; border-left: 1px solid #334155; color: #cbd5e1; font-size: 16px; }
+  .env { margin-left: auto; display: flex; align-items: center; gap: 8px; color: #cbd5e1; font-size: 15px; }
+  .env i { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(16, 185, 129, .2); }
+  main { display: grid; grid-template-columns: 1fr 280px; gap: 28px; max-width: 1000px; margin: 34px auto; padding: 0 36px; }
+  h1 { margin: 0; font-size: 32px; letter-spacing: -0.02em; }
+  .sub { margin: 2px 0 22px; color: var(--muted); }
+  .flag { display: grid; grid-template-columns: 1fr 150px 118px; align-items: center; gap: 20px; padding: 20px 24px; margin-bottom: 14px; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+  .name { font: 600 19px "Cascadia Mono", Consolas, monospace; }
+  .desc { color: var(--muted); font-size: 16px; }
+  .meter { height: 10px; border-radius: 5px; background: #eef2f7; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; border-radius: 5px; background: var(--green); transition: width 1.4s cubic-bezier(.2, .8, .2, 1); }
+  .reach { margin-top: 6px; color: var(--muted); font-size: 15px; }
+  .pill { justify-self: end; padding: 6px 14px; border-radius: 999px; background: #f1f5f9; color: var(--muted); font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .pill.live { background: var(--green-soft); color: var(--green-ink); }
+  aside { align-self: start; padding: 20px 22px 8px; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+  aside h2 { margin: 0 0 6px; font-size: 17px; }
+  .event { padding: 11px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .event b { font: 600 15px "Cascadia Mono", Consolas, monospace; }
+  .event span { display: block; color: var(--faint); font-size: 14px; }
+  .empty { color: var(--faint); font-size: 15px; padding: 10px 0 14px; }
+</style>
+<header>
+  <div class="logo"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V2"/><path d="M4 3h9l-2 3.5L13 10H4"/></svg></div>
+  <span class="brand">flagpole</span>
+  <span class="project">roastery-shop</span>
+  <span class="env"><i></i>production</span>
+</header>
+<main>
+  <section>
+    <h1>Flags</h1>
+    <p class="sub" id="summary">&nbsp;</p>
+    <div id="flags"></div>
+  </section>
+  <aside><h2>Activity</h2><div id="events"></div></aside>
+</main>
+<script>
+  const ago = (ms) => { const s = Math.max(1, Math.round((Date.now() - ms) / 1000)); return s < 60 ? `${s}s ago` : `${Math.round(s / 60)} min ago`; };
+  const status = (r) => (r <= 0 ? ['Off', ''] : r >= 100 ? ['Live', 'live'] : [`Live · ${r}%`, 'live']);
+  const rows = new Map();
+  function row(flag) {
+    if (rows.has(flag.name)) return rows.get(flag.name);
+    const el = document.createElement('div');
+    el.className = 'flag';
+    el.id = `flag-${flag.name}`;
+    el.innerHTML = '<div><div class="name"></div><div class="desc"></div></div><div><div class="meter"><i></i></div><div class="reach"></div></div><div class="pill"></div>';
+    document.getElementById('flags').append(el);
+    rows.set(flag.name, el);
+    return el;
+  }
+  function render({ flags, history }) {
+    for (const flag of flags) {
+      const el = row(flag), [label, cls] = status(flag.rollout);
+      el.querySelector('.name').textContent = flag.name;
+      el.querySelector('.desc').textContent = flag.description;
+      el.querySelector('.reach').textContent = `${flag.rollout}% of users`;
+      const pill = el.querySelector('.pill');
+      pill.textContent = label;
+      pill.className = `pill ${cls}`;
+      // The bars grow in from zero on the first paint, then follow the rollout.
+      requestAnimationFrame(() => { el.querySelector('.meter i').style.width = `${flag.rollout}%`; });
+    }
+    const live = flags.filter((f) => f.rollout > 0).length;
+    document.getElementById('summary').textContent = `${flags.length} flags · ${live} live in production`;
+    const events = history.slice(-5).reverse();
+    document.getElementById('events').innerHTML = events.length ? '' : '<div class="empty">No changes yet.</div>';
+    for (const e of events) {
+      const div = document.createElement('div');
+      div.className = 'event';
+      div.innerHTML = '<b></b> → <strong></strong><span></span>';
+      div.querySelector('b').textContent = e.flag;
+      div.querySelector('strong').textContent = `${e.rollout}%`;
+      div.querySelector('span').textContent = `from the CLI · ${ago(e.at)}`;
+      document.getElementById('events').append(div);
+    }
+  }
+  const refresh = () => fetch('/api/flags').then((res) => res.json()).then(render).catch(() => {});
+  refresh();
+  setInterval(refresh, 1500);
+</script>
+</html>

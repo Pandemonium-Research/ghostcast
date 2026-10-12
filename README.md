@@ -10,12 +10,12 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/ticklist.gif" width="800" alt="A task is added in a web app, marked done with a command in a terminal, and shown as done in its JSON file in VS Code; the camera eases in on each result.">
+  <img src="docs/media/flagpole.gif" width="800" alt="A feature flag is shown off in flags.yaml in VS Code, rolled out to 50% with a command in a terminal, shown live on a dashboard, and seen as a new Express checkout button in a shop; captions name each step and the scenes dissolve into each other.">
 </p>
 <p align="center">
-  <sub>Filmed from <a href="#a-planned-video">the storyboard below</a>: a web app, a real terminal
-  and VS Code, all working on a disposable copy of the project. No sleeps, zooms or timestamps
-  were written.</sub>
+  <sub>Filmed from <a href="#a-planned-video">one storyboard</a>: VS Code, a real terminal and two
+  web pages, all working on a disposable copy of the project. The camera, timing, captions and
+  dissolves were not edited by hand.</sub>
 </p>
 
 ghostcast drives real terminals, editors and web apps in a headless Chrome, keeps every frame,
@@ -24,10 +24,10 @@ narration and checked before anyone watches it. Nothing on your screen is record
 and every shoot runs in a disposable copy of your project.
 
 > [!NOTE]
-> **Pre-release (0.1).** Quick shoots, storyboards, the automatic camera and timing, and the
-> checks work today on Windows, macOS and Linux. Built-in speech, output presets and the engine
-> interface are next: see the [roadmap](#roadmap). ghostcast is not on npm yet; install it from
-> source.
+> **Pre-release (0.1).** Quick shoots, storyboards, the automatic camera and timing, captions and
+> dissolves, the checks and local speech work today on Windows, macOS and Linux. The recording
+> booth, output presets and the engine interface are next: see the [roadmap](#roadmap). ghostcast
+> is not on npm yet; install it from source.
 
 ## Contents
 
@@ -60,7 +60,8 @@ ghostcast is for videos of software as it really runs.
   and after, and a shoot fails if it changed.
 - **Directed from intent.** A storyboard says what to do and what the viewer must see. The camera
   frames the text it reads from the page (a terminal row, an editor line, a button), and each
-  beat is fitted to its line: still holds shorten first, then moves play faster.
+  beat is fitted to its line: still holds shorten first, then moves play faster. Captions,
+  dissolves and title cards come from the same file.
 - **Honest by design.** Everything shown really runs. Every sped-up stretch is tagged `N×` on
   screen. Checks report small text, overlong holds, near-empty frames, secrets on screen and
   misplaced narration, and an agent's description of a beat must quote text that was really on
@@ -112,43 +113,44 @@ exit code is reported even when it fails. No project files are needed.
 ## A planned video
 
 For a how-to, a feature or a launch, the plan lives in `.ghostcast/` next to the code it shows.
-A storyboard is a list of beats: what to do, what the viewer must see, and what is said. This is
-the one that made the video at the top, for ticklist, a small task tracker in
-[`demo/ticklist/`](demo/ticklist):
+A storyboard is a list of beats: what to do, what the viewer must see, what the caption says and
+what is said. The video at the top is six beats for flagpole, a small feature-flag tool in
+[`demo/flagpole/`](demo/flagpole); three of them:
 
 ```yaml
 # .ghostcast/storyboard.yaml
-video: ticklist-tour
-type: feature
+video: flagpole-launch
+transition: fade
 beats:
-  - id: add
+  - id: rollout
+    surface: terminal
+    claim: One command rolls a flag out in steps.
+    do:
+      - run: flagpole rollout new-checkout 50%
+    show: row "is live for 50% of users"
+    caption: Roll out from the terminal
+    say: One command rolls it out to half of your users, in five steps, so a bad change shows up early.
+
+  - id: dashboard
     surface: web
     open: /
-    claim: Tasks are added in the web app.
-    do:
-      - fill: { New task: Write the release notes }
-      - click: Add
-    show: text "Write the release notes"
-    say: ticklist keeps a team's tasks. Add one in the web app and it joins the list as number four.
+    claim: The dashboard shows the rollout as soon as it happens.
+    show: 'css #flag-new-checkout'
+    caption: Watch it go live
+    say: The dashboard picks up the change straight away, with every step in its activity log.
 
-  - id: finish
-    surface: terminal
-    claim: The command line works on the same list.
-    do:
-      - run: ticklist done 4
-    show: 'row "Done: Write the release notes"'
-    say: The command line works on the same list, so you can finish it from the terminal.
-
-  - id: file
-    surface: editor
-    open: tasks.json
-    claim: The list is one plain JSON file.
-    show: line "Write the release notes"
-    say: Underneath, it is one plain JSON file, a task per line.
+  - id: shop
+    surface: web
+    open: /shop
+    claim: Shoppers in the rollout get the new checkout.
+    show: text "Express checkout"
+    caption: Half your users see it now
+    say: And half of your shoppers now get the new express checkout.
 ```
 
-Its `world.yaml` starts the web app in each copy and seeds the tasks; run `ghostcast next` in
-`demo/ticklist` to film it yourself.
+The rest is [in the demo](demo/flagpole/.ghostcast/storyboard.yaml): the editor beat on
+`flags.yaml`, and a title and end card written as HTML. Its `world.yaml` starts the app in each
+copy; run `ghostcast next` in `demo/flagpole` to film it yourself.
 
 `ghostcast next` says where the video stands and the one thing to do next. The whole loop:
 
@@ -269,6 +271,7 @@ directory). `ghostcast --help` lists every option.
 
 | Command | |
 |---|---|
+| `ghostcast voice [--install] [--approve]` | Speak every beat's line with Kokoro (local; `--install` fetches it once) or ElevenLabs (your key; `--approve` the cost), cached |
 | `ghostcast vo-script` | Narration timed against the cut, with fit warnings |
 | `ghostcast pauses <audio…>` | Where to split recorded clips |
 | `ghostcast vo-mix [--plan file]` | Lay the voice-over → final video and a placement report |
@@ -282,7 +285,7 @@ directory). `ghostcast --help` lists every option.
 | [`docs/gotchas.md`](docs/gotchas.md) | The capture problems ghostcast works around, and how |
 | [`VISION.md`](VISION.md) | Where ghostcast is going, and why |
 | [`PLAN.md`](PLAN.md) | The stages toward version 1, with progress and decisions |
-| [`demo/ticklist/`](demo/ticklist) | The project filmed for the video above, with its whole plan |
+| [`demo/flagpole/`](demo/flagpole) | The project filmed for the video above, with its whole plan and cards |
 | [`docs/bakeoff.md`](docs/bakeoff.md) | One developer-tool story filmed by several agent video tools |
 | [`test/README.md`](test/README.md) | The test suite and its vectors |
 
@@ -295,9 +298,9 @@ the stages.
 
 | | |
 |---|---|
-| **Done** | One-command install and quick shoots (a first clip in under a minute on each OS, timed in CI); isolation; the studio plan and `ghostcast next`; automatic camera and timing; checks and confirmations |
-| **Next** | Voice from any source, fitted by beat: Kokoro locally by default, ElevenLabs with your own key, or your own recordings |
-| **Then** | Output presets for GitHub, social feeds, YouTube and submissions, with narration as captions; a JSON interface for other pipelines; version 1 on npm |
+| **Done** | One-command install and quick shoots (a first clip in under a minute on each OS, timed in CI); isolation; the studio plan and `ghostcast next`; automatic camera and timing; checks and confirmations; captions and dissolves; speech from Kokoro or ElevenLabs, fitted and placed by beat |
+| **Next** | The recording booth for your own voice, and your existing clips aligned to the script |
+| **Then** | Output presets for GitHub, social feeds, YouTube and submissions, with subtitles; a JSON interface for other pipelines; version 1 on npm |
 
 ## Contributing
 

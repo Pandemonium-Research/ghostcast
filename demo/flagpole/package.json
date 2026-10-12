@@ -1,0 +1,12 @@
+{
+  "name": "flagpole",
+  "private": true,
+  "description": "Feature flags from your terminal: a command, a live dashboard and flags.yaml in your repo.",
+  "type": "module",
+  "bin": {
+    "flagpole": "bin/flagpole"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

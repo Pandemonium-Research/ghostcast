@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# The flagpole command, from wherever it is called.
+exec node "$(dirname "${BASH_SOURCE[0]}")/../cli.js" "$@"

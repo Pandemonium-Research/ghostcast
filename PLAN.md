@@ -18,8 +18,8 @@ as work lands.
 | 4 | [Plan](#stage-4--plan) | 2 | Done: a fresh agent reached an approved, rehearsed storyboard from SKILL.md alone |
 | 5 | [Direction](#stage-5--direction) | 4 | Done: the Skilldex story shoots from a storyboard, side by side with the original |
 | 6 | [Checks](#stage-6--checks) | 4, 5 | Done: the checks find the hand-made cut's known issues; the three-beat remake checks clean and is confirmed |
-| 7 | [Voice](#stage-7--voice) | 1, 4 | Not started |
-| 8 | [Delivery](#stage-8--delivery) | 1, 7 | Not started |
+| 7 | [Voice](#stage-7--voice) | 1, 4 | In progress: Kokoro and ElevenLabs, cached, fitted and placed by beat; the booth and clip alignment are left |
+| 8 | [Delivery](#stage-8--delivery) | 1, 7 | In progress: captions and dissolves from the storyboard (pulled forward); presets and subtitles are left |
 | 9 | [Engine interface](#stage-9--engine-interface) | 5, 6 | Not started |
 | 10 | [The Skilldex remake and version 1](#stage-10--the-skilldex-remake-and-version-1) | all | Not started |
 
@@ -485,13 +485,22 @@ Progress:
   editor beat found one more bug: page text was logged a box per element, so VS Code's coloured
   tokens read as `name`, `:`, `conventional-commit` and no quote spanning tokens could match.
   Boxes on one visual row are now read as one line.
-- **The README's demo** is filmed from `demo/ticklist`, a small made-up task tracker in the repo
-  (web app, `ticklist` command, `tasks.json`), so anyone can re-shoot it. It found two more editor
-  bugs: `openFile` typed a relative path into Quick Open and pressed Enter on whatever came first,
-  and Quick Open leaves out git-ignored files, so a generated `tasks.json` opened as
-  `tasks.seed.json`; it now types the absolute path and fails unless the file it asked for opened.
-  And the `short` tab label showed a root file's parent, the world copy's random folder name; tabs
-  now show the file name alone.
+- **The README's demo** is filmed from a made-up project in the repo, so anyone can re-shoot it:
+  first `demo/ticklist`, a task tracker, now `demo/flagpole`, a feature-flag tool (a flag off in
+  `flags.yaml`, rolled out with `flagpole rollout`, live on a dashboard, seen in a shop), with
+  captions, dissolves and HTML title and end cards (stage 8's captions and transitions, pulled
+  forward for it). Bugs it found, all fixed:
+  - `openFile` typed a relative path into Quick Open and pressed Enter on whatever came first;
+    Quick Open leaves out git-ignored files, so a generated `tasks.json` opened as
+    `tasks.seed.json`. It now types the absolute path and fails unless that file opened.
+  - The `short` tab label showed a root file's parent, the world copy's random folder name; tabs
+    now show the file name alone.
+  - A terminal beat after an editor beat failed: `setContent` kept VS Code's Content Security
+    Policy, which blocked the terminal's scripts. The terminal now starts from a blank page.
+  - A web beat with nothing to click showed the cursor parked over what it framed; such beats now
+    hide it.
+  - A dissolve into a beat that opens with a short piece (0.2 s before sped-up typing) lasted
+    0.2 s; it now carries across the opening pieces.
 - **Seen on the way, not fixed:** the first rehearsal had the registry beat fail once in three
   runs (the live site's search result never came within 15 s; a probe and a second rehearsal
   found nothing wrong); rehearsal is what caught it. With the VS Code server downloaded today,
@@ -535,6 +544,22 @@ Done when:
 **Goal:** the same storyboard can be voiced by Kokoro, by ElevenLabs with your own key, or by you,
 without changing the storyboard.
 
+Progress:
+
+- **`ghostcast voice`** speaks each `say` line and writes `voiceover/<beat>.wav` with a generated
+  `plan.json` that `vo-mix` reads; `all` generates before shooting and mixes after, and `next`
+  gains a voice stage. A generated plan makes each beat at least as long as its clip.
+- **Kokoro** installs only with `ghostcast voice --install` (kokoro-js 1.2.1 into ghostcast's data
+  folder: 13 s here, then 35 s to speak three lines); nothing downloads without the flag. The
+  clips are real speech at about 2.9 words a second.
+- **ElevenLabs** reads the key from the environment or `secrets.env`, counts the characters of
+  uncached lines and stops until `--approve`. Not yet run against the real service (it needs the
+  user's key and spends their credits).
+- **The cache** keys clips on provider, voice, model, speed and text: a second run with unchanged
+  lines took 0.2 s and loaded no model.
+- **Left:** the recording booth, Whisper alignment of existing clips, a real ElevenLabs run, and
+  a voiced end-to-end shoot.
+
 Build:
 
 - **Kokoro by default.** Through kokoro-js on the CPU:
@@ -570,6 +595,15 @@ Done when:
 ## Stage 8 · Delivery
 
 **Goal:** a file that fits where it's going, first time.
+
+Progress (pulled forward for the README's demo):
+
+- **Captions:** a beat's `caption` is a lower-third (rounded box, accent bar, at most two lines)
+  from 0.3 s into the beat until it ends, capped below the caption-long limit. Size, colours and
+  accent come from `captions` in project.json.
+- **Dissolves:** `transition: fade` (per beat, or for the whole storyboard) dissolves the previous
+  beat's last frame into the beat's opening. Nothing moves in the timeline, joins stay stream
+  copy, and only the dissolving pieces re-render when a neighbour changes.
 
 Build:
 

@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- The end card: what made this video. Animated on window.play(), like the title card. -->
+<html lang="en">
+<meta charset="utf-8">
+<title>Made with ghostcast</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { display: grid; place-items: center; overflow: hidden; color: #fff; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: radial-gradient(900px 520px at 50% 30%, rgba(124, 108, 246, .28), transparent 70%), #0d0b1a; }
+  main { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .made { font-size: 30px; color: #b9b2e8; letter-spacing: .02em; }
+  h1 { margin: 0 0 6px; font-size: 118px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+  h1 span { color: #a99bff; }
+  pre { margin: 10px 0 0; padding: 26px 34px; border-radius: 18px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(169, 155, 255, .35);
+    font: 25px/1.55 "Cascadia Mono", Consolas, Menlo, monospace; color: #e7e3ff; }
+  .k { color: #a99bff; } .s { color: #86efac; } .d { color: #8b85b8; }
+  footer { margin-top: 8px; font: 500 26px "Cascadia Mono", Consolas, monospace; color: #b9b2e8; }
+  .made, h1, pre, footer { opacity: 0; }
+  .go .made { animation: rise .6s ease-out forwards; }
+  .go h1 { animation: rise .6s .15s ease-out forwards; }
+  .go pre { animation: rise .7s .45s ease-out forwards; }
+  .go footer { animation: rise .6s .8s ease-out forwards; }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+</style>
+<main>
+  <div class="made">This video was made by</div>
+  <h1>ghost<span>cast</span></h1>
+  <pre><span class="d">- </span><span class="k">id:</span> rollout
+  <span class="k">surface:</span> terminal
+  <span class="k">do:</span>
+    <span class="d">- </span><span class="k">run:</span> <span class="s">flagpole rollout new-checkout 50%</span>
+  <span class="k">show:</span> <span class="s">row "is live for 50% of users"</span>
+  <span class="k">caption:</span> <span class="s">Roll out from the terminal</span></pre>
+  <footer>from one storyboard · github.com/Sampriti2803/ghostcast</footer>
+</main>
+<script>
+  window.play = () => document.body.classList.add('go');
+  if (!/[?&]hold=1/.test(location.search)) window.play();
+</script>
+</html>

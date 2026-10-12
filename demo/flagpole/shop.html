@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>House Blend · Roastery</title>
+<style>
+  :root { --bg: #faf7f2; --card: #fff; --ink: #2a1d14; --muted: #7a6a5c; --line: #eadfd3; --accent: #c2410c; --accent-ink: #fff; --bag: #3b2a1f; --label: #f3e6d4; }
+  .dark { --bg: #17120e; --card: #221a14; --ink: #f6eee6; --muted: #b8a797; --line: #3a2d23; --bag: #c2410c; --label: #fbe9d6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font: 19px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--bg); transition: background .3s, color .3s; }
+  header { display: flex; align-items: center; gap: 40px; height: 72px; padding: 0 56px; border-bottom: 1px solid var(--line); }
+  .wordmark { font: 700 28px Georgia, "Times New Roman", serif; letter-spacing: -0.01em; }
+  nav { display: flex; gap: 28px; color: var(--muted); font-size: 17px; }
+  .cart { margin-left: auto; color: var(--muted); font-size: 17px; }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; max-width: 1180px; margin: 54px auto; padding: 0 56px; align-items: center; }
+  .photo { aspect-ratio: 1; border-radius: 24px; background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, .08), transparent 60%), var(--card); border: 1px solid var(--line); display: grid; place-items: center; }
+  .bag { width: 46%; aspect-ratio: .72; border-radius: 14px 14px 22px 22px; background: var(--bag); position: relative; box-shadow: 0 30px 50px rgba(0, 0, 0, .25); }
+  .bag::before { content: ""; position: absolute; top: -14px; left: 8%; right: 8%; height: 22px; border-radius: 6px; background: var(--bag); filter: brightness(.8); }
+  .bag .tag { position: absolute; left: 14%; right: 14%; top: 30%; padding: 18px 10px; border-radius: 10px; background: var(--label); color: #2a1d14; text-align: center; font: 700 22px Georgia, serif; }
+  .bag .tag small { display: block; font: 600 12px "Segoe UI", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #7a6a5c; }
+  .kicker { color: var(--accent); font-size: 15px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  h1 { margin: 6px 0 4px; font: 700 52px/1.1 Georgia, serif; letter-spacing: -0.02em; }
+  .notes { color: var(--muted); }
+  .price { margin: 22px 0; font-size: 34px; font-weight: 700; }
+  .sizes { display: flex; gap: 10px; margin-bottom: 30px; }
+  .sizes span { padding: 8px 18px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 16px; }
+  .sizes .on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+  .buy { display: flex; flex-direction: column; gap: 12px; max-width: 420px; }
+  button { font: inherit; font-weight: 700; padding: 16px 24px; border-radius: 14px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+  button.primary { border: 0; background: var(--accent); color: var(--accent-ink); }
+  .express { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 21px; }
+  .hint { color: var(--muted); font-size: 15px; text-align: center; }
+</style>
+<header>
+  <span class="wordmark">Roastery</span>
+  <nav><span>Coffee</span><span>Gear</span><span>Subscriptions</span></nav>
+  <span class="cart">Cart (0)</span>
+</header>
+<main>
+  <div class="photo"><div class="bag"><div class="tag"><small>Roastery</small>House Blend</div></div></div>
+  <section>
+    <div class="kicker">Medium roast</div>
+    <h1>House Blend</h1>
+    <div class="notes">Chocolate, caramel and toasted nut.</div>
+    <div class="price">$16.00</div>
+    <div class="sizes"><span class="on">340 g</span><span>1 kg</span></div>
+    <div class="buy" id="buy"></div>
+  </section>
+</main>
+<script>
+  fetch('/api/shop').then((res) => res.json()).then(({ express, dark }) => {
+    document.body.classList.toggle('dark', dark);
+    document.getElementById('buy').innerHTML = express
+      ? '<button class="primary express">⚡ Express checkout</button><div class="hint">One tap with your saved card</div><button>Add to cart</button>'
+      : '<button class="primary">Add to cart</button><button>Checkout</button>';
+  });
+</script>
+</html>

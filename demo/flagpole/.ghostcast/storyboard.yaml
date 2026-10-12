@@ -1,0 +1,46 @@
+video: flagpole-launch
+type: feature
+transition: fade
+beats:
+  - id: title
+    surface: panel
+    panel: { html: panels/title.html, data: { hold: 1 } }
+    say: Feature flags, from your terminal.
+
+  - id: flags
+    surface: editor
+    open: flags.yaml
+    claim: Flags live in the repository, in flags.yaml.
+    show: 'line "rollout: 0%"'
+    caption: Flags live in your repo
+    say: Your flags live in flags.yaml, right in the repo.
+
+  - id: rollout
+    surface: terminal
+    claim: One command rolls a flag out in steps.
+    do:
+      - run: flagpole rollout new-checkout 50%
+    show: row "is live for 50% of users"
+    caption: Roll out from the terminal
+    say: One command rolls it out to half of your users, in five steps, so a bad change shows up early.
+
+  - id: dashboard
+    surface: web
+    open: /
+    claim: The dashboard shows the rollout as soon as it happens.
+    show: 'css #flag-new-checkout'
+    caption: Watch it go live
+    say: The dashboard picks up the change straight away, with every step in its activity log.
+
+  - id: shop
+    surface: web
+    open: /shop
+    claim: Shoppers in the rollout get the new checkout.
+    show: text "Express checkout"
+    caption: Half your users see it now
+    say: And half of your shoppers now get the new express checkout.
+
+  - id: made-with
+    surface: panel
+    panel: { html: panels/end.html, data: { hold: 1 } }
+    say: Made with ghostcast, from one storyboard.

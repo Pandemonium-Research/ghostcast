@@ -1,0 +1,9 @@
+source: ..          # demo/flagpole, the folder around .ghostcast/
+mode: snapshot      # each take starts from flags.yaml as committed, new-checkout at 0%
+services:
+  - name: web
+    cmd: node server.js
+    port: true
+    ready:
+      url: http://127.0.0.1:${PORT}/
+      timeout: 30000

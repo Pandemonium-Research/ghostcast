@@ -122,6 +122,10 @@ beats:
 - **show**: what the viewer must see, one target: `text "…"`, `role button "…"`, `label "…"`,
   `css <selector>` on web and panels; `row "…"` on terminal; `line "…"` in the editor. The camera
   frames it and holds while the line is said.
+- **caption**: words on screen for the beat, as a lower-third: a few words (at most 10) that a
+  silent viewer reads at a glance, not the `say` line. It stays until the beat ends.
+- **transition**: `fade` dissolves the previous beat's last picture into this one; `cut` (the
+  default) does not. Set it on a beat, or once at the top of the storyboard for every beat.
 - **panel**: `{ use: title | chapter | cta, title, subtitle, foot }`, or `{ html: panels/x.html,
   data: {…} }`. Panels frame the story, at most a fifth of the runtime; they never mock the
   product.
@@ -167,14 +171,22 @@ large read-only folder instead of copying it; a write through a link fails the s
 
 The brief's `audio` and `.ghostcast/audio.yaml` say where the voice comes from. Today:
 
-- **none**: a silent video. `say` lines are **not** shown as captions yet; they are the script
-  and the timing budget.
+- **none**: a silent video. `say` lines are the script and the timing budget; put the words a
+  viewer should read in `caption`.
+- **kokoro**: local speech on the CPU (`voice: af_heart`, or another Kokoro voice). The first time,
+  `ghostcast voice` stops and asks for `ghostcast voice --install`, a one-time download of about
+  500 MB: ask the user before running it. After that, `ghostcast all` speaks every `say` line,
+  cuts each beat at least as long as its line, and mixes `out/<video>.mp4`.
+- **elevenlabs**: the user's own key, in `ELEVENLABS_API_KEY` or `.ghostcast/secrets.env` (never
+  in a committed file, never printed). `ghostcast voice` prints the characters it would send and
+  stops; show the user that number and run `ghostcast voice --approve` only after they agree.
 - **clips**: the user records the lines; you place them. Put the clips in
   `.ghostcast/voiceover/`, run `ghostcast pauses voiceover/*` to find sentence breaks, write
   `voiceover/plan.json` with pieces anchored to `take: storyboard` and `segment: <beat id>`,
   then `ghostcast vo-mix` and fix everything under "Problems" in its report.
 
-Built-in speech (kokoro, locally; ElevenLabs with the user's own key) comes in a later version.
+Generated lines are cached on their text and voice, so changing one line regenerates only that
+line.
 
 ## Rules
 
