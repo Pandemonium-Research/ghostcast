@@ -39,12 +39,13 @@ const HELP = `ghostcast — a recording studio for coding agents
   ghostcast record <take> [--headed] [--keep-world]
                                         run the take in an isolated world
   ghostcast cut <take> [...]            raw/<take>/ → clips/<take>.mp4 (segments, speed, zoom)
-  ghostcast all [<take> ...] [--keep-world]
+  ghostcast all [<take> ...] [--keep-world] [--install] [--approve]
                                         record + cut each take (one retry), then assemble
   ghostcast assemble                    clips + captions → out/<name>-silent.mp4 + cue sheet
   ghostcast review <take|final|beats> [--raw] [--at <s>] [--every <s>]
                                         contact sheets and stills under out/review/
 
+  ghostcast voice [--install] [--approve] generate cached speech clips and a beat plan
   ghostcast vo-script                   narration blocks timed against the cut → out/voiceover-script.md
   ghostcast pauses <audio> [...]        silences in voice-over clips: where to cut them into pieces
   ghostcast vo-mix [--plan <file>]      lay the voice-over → out/<name>.mp4 + placement report
@@ -322,6 +323,8 @@ const commands = {
     console.log(`info  VS Code server cache: ${cli}\n      ${builds.length
       ? `${builds.length} build(s) downloaded`
       : 'empty: the first `ghostcast vscode` downloads a build (about 600 MB), which can take a few minutes'}`);
+    const { voiceDoctor } = await import('../src/voice/index.mjs');
+    for (const line of voiceDoctor(fs.existsSync(path.join(projectDir, 'product.md')) ? projectDir : studioDir())) console.log(line);
     console.log(`info  isolated worlds: ${worldsDir()}`);
     if (process.platform === 'win32') {
       check('VS Code server cache path short enough for Windows', cli.length + SERVER_DEPTH <= 259,
@@ -387,6 +390,13 @@ const commands = {
     const { review } = await import('../src/post/review.mjs');
     try { await review(projectDir, argv); } catch (e) { die(e.message); }
   },
+  async voice() {
+    const install = flag('--install'), approve = flag('--approve');
+    if (argv.length) die('usage: ghostcast voice [--install] [--approve]');
+    const { voice } = await import('../src/voice/index.mjs');
+    try { await voice(fs.existsSync(path.join(projectDir, 'product.md')) ? projectDir : studioDir(), { install, approve }); }
+    catch (error) { die(error.message); }
+  },
   async 'vo-script'() { const { voScript } = await import('../src/post/voice.mjs'); try { voScript(projectDir); } catch (e) { die(e.message); } },
   async pauses() { const { pauses } = await import('../src/post/voice.mjs'); try { await pauses(argv); } catch (e) { die(e.message); } },
   async 'vo-mix'() { const { voMix } = await import('../src/post/voice.mjs'); try { await voMix(projectDir, argv); } catch (e) { die(e.message); } },
@@ -394,6 +404,13 @@ const commands = {
   async all() {
     const headed = flag('--headed');
     const keep = flag('--keep-world');
+    const install = flag('--install'), approve = flag('--approve');
+    const { readAudio, voice } = await import('../src/voice/index.mjs');
+    const spoken = fs.existsSync(path.join(projectDir, 'storyboard.yaml')) && ['kokoro', 'elevenlabs'].includes(readAudio(projectDir).provider);
+    if (spoken) {
+      try { await voice(projectDir, { install, approve }); }
+      catch (error) { die(error.message); }
+    }
     await compileStudio();
     const takes = argv.length ? argv : timeline().items.map((i) => i.take);
     const failed = [];
@@ -423,6 +440,12 @@ const commands = {
       }
     }
     if (failed.length) { console.error(`failed: ${failed.join(', ')}`); code = 1; }
+    if (spoken && !code && untouched) {
+      try {
+        const { voMix } = await import('../src/post/voice.mjs');
+        await voMix(projectDir);
+      } catch (error) { console.error(error.message); code = 1; }
+    }
     try {
       const { checkProject, formatCheck, writeCheckReport } = await import('../src/check/index.mjs');
       // The shoot succeeded whatever the checks find: they are a report, and `next` gates on it.

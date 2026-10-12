@@ -1,11 +1,16 @@
 provider: none
 
-# For your own voice-over clips, place them with `ghostcast pauses` and `ghostcast vo-mix`:
-# provider: clips
-# dir: voiceover/
-
-# Built-in speech from kokoro and elevenlabs arrives in a later version.
+# Local CPU speech; downloads only with ghostcast voice --install:
 # provider: kokoro
-# voice: <voice name>
+# voice: af_heart
+# model: onnx-community/Kokoro-82M-v1.0-ONNX
+# speed: 1
+
+# Speech with your key in ELEVENLABS_API_KEY or secrets.env; approve uncached cost:
 # provider: elevenlabs
 # voice: <ElevenLabs voice ID>
+# model: eleven_multilingual_v2
+
+# For your own clips, write voiceover/plan.json and run ghostcast vo-mix:
+# provider: clips
+# dir: voiceover/

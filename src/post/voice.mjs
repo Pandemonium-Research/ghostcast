@@ -132,9 +132,12 @@ export function place(pieces, takes, total) {
   return [placed, problems];
 }
 
+export const resolveVoiceClip = (planFile, clip) => path.resolve(path.dirname(planFile), clip);
+
 export async function voMix(root, args = []) {
   const planFile = args.includes('--plan') ? args[args.indexOf('--plan') + 1] : 'voiceover/plan.json';
-  const plan = readJson(path.resolve(root, planFile));
+  const resolvedPlan = path.resolve(root, planFile);
+  const plan = readJson(resolvedPlan);
   const name = cfg(root).name ?? 'screencast';
   const silent = path.join(root, 'out', `${name}-silent.mp4`);
   if (!fs.existsSync(silent)) throw new Error(`no out/${path.basename(silent)} (run: ghostcast assemble)`);
@@ -145,8 +148,8 @@ export async function voMix(root, args = []) {
   const [placed, problems] = place(plan.pieces, takes, total);
   const inputs = ['-i', silent], chains = [];
   for (const [k, p] of placed.entries()) {
-    const clip = path.join(root, 'voiceover', p.clip);
-    if (!fs.existsSync(clip)) throw new Error(`no voiceover/${p.clip}`);
+    const clip = resolveVoiceClip(resolvedPlan, p.clip);
+    if (!fs.existsSync(clip)) throw new Error(`no clip ${clip}`);
     inputs.push('-i', clip);
     const length = p.end - p.start;
     chains.push(`[${k + 1}:a]atrim=start=${fixed(p.from, 3)}:end=${fixed(p.to, 3)},asetpts=PTS-STARTPTS,aresample=48000,` +

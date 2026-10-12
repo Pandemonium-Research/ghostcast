@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../studio/schema.mjs';
 import { words } from '../studio/lint.mjs';
+import { generatedPlan } from '../voice/index.mjs';
 
 export const directionDefaults = Object.freeze({ readingWordsPerSecond: 3, readingBase: .5, readingMax: 4,
   minHold: 1.5, minBeat: 2, movesPerMinute: 12, minZoomGain: 1.2, maxSpeed: 12, stillSsim: .995 });
@@ -120,7 +121,13 @@ export function fitTargets(root, take, log, cfg = {}) {
   if (!fs.existsSync(file)) return { targets, readings };
   const story = parseYaml(fs.readFileSync(file, 'utf8'), 'storyboard.yaml').data;
   const policy = direction(cfg), wps = cfg.voiceover?.wordsPerSecond ?? 2.5;
-  for (const beat of story?.beats ?? []) if (beat?.id) targets[beat.id] = Math.max(words(beat.say) / wps + .6, policy.minBeat);
+  const plan = generatedPlan(root);
+  for (const beat of story?.beats ?? []) if (beat?.id) {
+    const piece = plan?.pieces.find((p) => p.take === 'storyboard' && p.segment === beat.id);
+    const clipSeconds = piece ? piece.to - piece.from : NaN;
+    targets[beat.id] = Math.max(Number.isFinite(clipSeconds) && clipSeconds > 0
+      ? (piece.offset ?? 0) + clipSeconds + .4 : words(beat.say) / wps + .6, policy.minBeat);
+  }
   for (const id of Object.keys(targets)) {
     const start = log.findIndex((e) => e[1] === `+${id}`);
     const end = log.findIndex((e, i) => i > start && e[1] === `-${id}`);

@@ -6,6 +6,7 @@ import { lint } from './lint.mjs';
 import { storyboardHash } from './approve.mjs';
 import { parseYaml, readBrief, validateBrief, validateProduct } from './schema.mjs';
 import { currentConfirmation } from './confirm.mjs';
+import { readAudio, voiceCommand } from '../voice/index.mjs';
 
 const result = (stage, state, next, problems = [], warnings = 0) => ({ stage, state, problems, next, warnings });
 const read = (file) => fs.readFileSync(file, 'utf8');
@@ -46,6 +47,17 @@ function postShoot(dir, story, currentHash, warnings, rehearsalProblems = []) {
   if (beats.length) return result('confirm', `${beats.length} beat${beats.length === 1 ? '' : 's'} need confirmation${warningSuffix(checks.warnings || 0)}`,
     'run ghostcast review beats, look at each sheet, and confirm what it shows: ' + beats.map((id) => 'ghostcast confirm ' + id + ' "…"').join(', '),
     [...beats.map((id) => ({ id, message: 'needs confirmation for the current take' })), ...checkWarnings], checks.warnings || warnings);
+  const audio = readAudio(dir);
+  if (['kokoro', 'elevenlabs'].includes(audio.provider)) {
+    const name = story.video || 'screencast', out = path.join(dir, 'out', name + '.mp4');
+    const placement = path.join(dir, 'out', name + '.placement.md');
+    const voiced = fs.existsSync(out) && fs.statSync(out).mtimeMs > fs.statSync(silent).mtimeMs;
+    const clean = fs.existsSync(placement) && /^Problems: none\s*$/m.test(read(placement));
+    if (voiced && clean) return result('done', 'the voiced cut is ready' + warningSuffix(checks.warnings || 0),
+      'out/' + name + '.mp4', checkWarnings, checks.warnings || warnings);
+    return result('voice', 'the confirmed cut needs voice-over' + warningSuffix(checks.warnings || 0),
+      'run `' + voiceCommand(dir, audio) + '`, then `ghostcast vo-mix`', checkWarnings, checks.warnings || warnings);
+  }
   return result('done', `the silent cut is ready; voice comes next${warningSuffix(checks.warnings || 0)}`, `out/${story.video || 'screencast'}-silent.mp4`, checkWarnings, checks.warnings || warnings);
 }
 
