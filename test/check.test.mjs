@@ -147,7 +147,8 @@ test('ffmpeg pixels: white frames with small text trigger empty, small text and 
 
 test('Chrome: a recorded take logs page facts and ghostcast check passes', { timeout: 180_000 }, async () => {
   const root = fixture({ story: true, storyboard: `video: sample\ncap: 100\nweight: standard\nbeats:\n  - id: alpha\n    surface: web\n    say: 'All systems are ready.'\n` });
-  const html = '<!doctype html><style>body{margin:0;font:32px Arial;background:repeating-linear-gradient(0deg,#f8f2dc 0 20px,#c7e4f3 20px 40px)}main{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;padding:24px}i{height:42px;background:linear-gradient(135deg,#e84a5f,#355c7d)}</style><main><h1>Facts driver works</h1>' + '<i></i>'.repeat(120) + '</main>';
+  const html = '<!doctype html><style>body{margin:0;font:32px Arial;background:repeating-linear-gradient(0deg,#f8f2dc 0 20px,#c7e4f3 20px 40px)}main{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;padding:24px}i{height:42px;background:linear-gradient(135deg,#e84a5f,#355c7d)}p{grid-column:1/-1;margin:0}b{font-weight:normal;color:#355c7d}</style><main><h1>Facts driver works</h1>'
+    + '<p><b>name</b><b>:&nbsp;</b><b>conventional-commit</b></p><p><b>Search</b> <b>skills</b></p>' + '<i></i>'.repeat(120) + '</main>';
   fs.writeFileSync(path.join(root, 'scene.mjs'), `export default async (h) => { await h.goto('data:text/html,${encodeURIComponent(html)}'); await h.seg('alpha', async () => { await h.sleep(2500); }); };\n`);
   fs.writeFileSync(path.join(root, 'timeline.json'), JSON.stringify({ items: [{ take: 'storyboard', scene: 'scene.mjs' }] }));
   const node = process.execPath, cli = path.join(here, '../bin/ghostcast.mjs');
@@ -156,6 +157,9 @@ test('Chrome: a recorded take logs page facts and ghostcast check passes', { tim
   const log = JSON.parse(fs.readFileSync(path.join(root, 'raw', 'storyboard', 'log.json'), 'utf8'));
   const snapshot = log.find((e) => e[1] === 'facts' && e[2]?.text);
   assert.ok(snapshot, 'facts event should be present'); assert.ok(snapshot[2].boxes.some((b) => b.px >= 24));
+  // Coloured tokens on one line read as that line, as an editor's syntax highlighting splits it.
+  assert.match(snapshot[2].text, /^name: conventional-commit$/m);
+  assert.match(snapshot[2].text, /^Search skills$/m);
   const checked = spawnSync(node, [cli, 'check', '--project', root], { encoding: 'utf8', timeout: 150_000 });
   assert.equal(checked.status, 0, checked.stderr || checked.stdout);
   assert.match(checked.stdout, /0 errors, 0 warnings/);

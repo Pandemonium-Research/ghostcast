@@ -111,11 +111,12 @@
     sleep, q, findText, textBox,
     facts() {
       const viewport = { x: 0, y: 0, w: innerWidth, h: innerHeight };
-      const boxes = [];
+      const boxes = [], spaced = new Map();
       const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_ELEMENT);
       for (let el = walker.nextNode(); el && boxes.length < 200; el = walker.nextNode()) {
         if (el.id?.startsWith('__rec_') || el.closest?.('#__rec_cursor,#__rec_hb,.__rec_mark')) continue;
-        const own = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.nodeValue || '').join(' ').replace(/\s+/g, ' ').trim();
+        const raw = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.nodeValue || '').join(' ');
+        const own = raw.replace(/\s+/g, ' ').trim();
         if (!own) continue;
         const style = getComputedStyle(el);
         if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
@@ -123,12 +124,29 @@
         const x = Math.max(0, r.left), y = Math.max(0, r.top), right = Math.min(innerWidth, r.right), bottom = Math.min(innerHeight, r.bottom);
         if (right <= x || bottom <= y) continue;
         const px = Number.parseFloat(style.fontSize) || 0;
-        boxes.push({ t: own.slice(0, 80), px, x, y, w: right - x, h: bottom - y });
+        const box = { t: own.slice(0, 80), px, x, y, w: right - x, h: bottom - y };
+        spaced.set(box, { lead: /^\s/.test(raw), trail: /\s$/.test(raw) });
+        boxes.push(box);
       }
+      // Boxes on one visual row (an editor line's coloured tokens, inline spans) are read as one
+      // line: joined by a space where the source had one or the boxes stand apart, by nothing
+      // where they touch, so text quoted from the screen matches across tokens.
+      const rows = [];
+      for (const b of [...boxes].sort((a, b) => a.y - b.y || a.x - b.x)) {
+        const mid = b.y + b.h / 2;
+        const row = rows.find((r) => Math.abs(r.mid - mid) < Math.min(r.h, b.h) / 2);
+        if (row) row.items.push(b); else rows.push({ mid, h: b.h, items: [b] });
+      }
+      const lines = rows.sort((a, b) => a.mid - b.mid).map((row) => row.items.sort((a, b) => a.x - b.x).reduce((line, b, i, items) => {
+        if (!i) return b.t;
+        const prev = items[i - 1];
+        const apart = spaced.get(prev).trail || spaced.get(b).lead || b.x - (prev.x + prev.w) > Math.max(prev.px, b.px) * 0.15;
+        return line + (apart ? ' ' : '') + b.t;
+      }, ''));
       boxes.sort((a, b) => a.y - b.y || a.x - b.x);
       let text = '', used = 0;
-      for (const b of boxes) {
-        const next = `${text ? '\n' : ''}${b.t}`;
+      for (const line of lines) {
+        const next = `${text ? '\n' : ''}${line}`;
         if (used + next.length > 6000) { text += next.slice(0, Math.max(0, 6000 - used)); break; }
         text += next; used += next.length;
       }
