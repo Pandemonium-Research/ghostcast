@@ -72,7 +72,8 @@ export async function enter(h, beat, previous) {
     const url = /^(?:https?:|file:)/i.test(open) ? open : open.startsWith('/')
       ? h.world.url(h.config.world.services.find((item) => item.port).name, open)
       : pathToFileURL(path.resolve(h.world?.dir || h.project.root, open)).href;
-    await h.goto(url);
+    // A cursor with nothing to point at only covers what the beat shows.
+    await h.goto(url, { cursor: (beat.do || []).some((action) => action.click || action.fill || action.code) });
   } else if (beat.surface === 'terminal' && (previous?.surface !== 'terminal' || beat.open !== undefined)) {
     await h.terminal.open(beat.open);
   } else if (beat.surface === 'editor' && (previous?.surface !== 'editor' || beat.open !== undefined)) {

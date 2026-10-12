@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# The ticklist command, from wherever it is called.
-exec node "$(dirname "${BASH_SOURCE[0]}")/../cli.js" "$@"

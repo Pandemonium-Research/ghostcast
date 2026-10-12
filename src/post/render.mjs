@@ -223,7 +223,9 @@ async function renderBeat(root, take, cfg, beat, keys, logEvents, pieces, fileHa
   if (beat.fade) {
     if (previousFrame) inputs.push('-stream_loop', '-1', '-i', previousFrame);
     else inputs.push('-f', 'lavfi', '-i', `color=c=${beat.fade.from.color.replace(/^#/, '0x')}:s=${cfg.output.width}x${cfg.output.height}:r=${fps}`);
-    graph += `;[1:v]settb=1/${fps * 1000},setpts=PTS-STARTPTS,format=yuva420p,fade=out:st=0:d=${beat.fade.seconds.toFixed(6)}:alpha=1[outgoing];[base][outgoing]overlay=0:0:shortest=1[dissolved]`;
+    // A piece that continues a dissolve picks the fade up `offset` seconds in.
+    const offset = beat.fade.offset ? `,trim=start=${beat.fade.offset.toFixed(6)},setpts=PTS-STARTPTS` : '';
+    graph += `;[1:v]settb=1/${fps * 1000},setpts=PTS-STARTPTS,format=yuva420p,fade=out:st=0:d=${beat.fade.seconds.toFixed(6)}:alpha=1${offset}[outgoing];[base][outgoing]overlay=0:0:shortest=1[dissolved]`;
     last = '[dissolved]';
   }
   for (let i = 0; i < pieces.length; i++) {

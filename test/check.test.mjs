@@ -145,6 +145,15 @@ test('ffmpeg pixels: white frames with small text trigger empty, small text and 
   assert.ok(!zoomed.some((p) => p.check === 'small-text' || p.check === 'near-empty'));
 });
 
+test('Chrome: a terminal opens after a page whose policy blocks inline scripts, as VS Code does', { timeout: 180_000 }, async () => {
+  const root = fixture();
+  const html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-eval'"><h1>Strict page</h1>`;
+  fs.writeFileSync(path.join(root, 'scene.mjs'), `export default async (h) => { await h.goto(${JSON.stringify(`data:text/html,${encodeURIComponent(html)}`)}); await h.terminal.open('.'); await h.seg('alpha', () => h.run('echo terminal-ok')); };\n`);
+  fs.writeFileSync(path.join(root, 'timeline.json'), JSON.stringify({ items: [{ take: 'alpha', scene: 'scene.mjs' }] }));
+  const record = spawnSync(process.execPath, [path.join(here, '../bin/ghostcast.mjs'), 'record', 'alpha', '--project', root], { encoding: 'utf8', timeout: 150_000 });
+  assert.equal(record.status, 0, record.stderr || record.stdout);
+});
+
 test('Chrome: a recorded take logs page facts and ghostcast check passes', { timeout: 180_000 }, async () => {
   const root = fixture({ story: true, storyboard: `video: sample\ncap: 100\nweight: standard\nbeats:\n  - id: alpha\n    surface: web\n    say: 'All systems are ready.'\n` });
   const html = '<!doctype html><style>body{margin:0;font:32px Arial;background:repeating-linear-gradient(0deg,#f8f2dc 0 20px,#c7e4f3 20px 40px)}main{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;padding:24px}i{height:42px;background:linear-gradient(135deg,#e84a5f,#355c7d)}p{grid-column:1/-1;margin:0}b{font-weight:normal;color:#355c7d}</style><main><h1>Facts driver works</h1>'

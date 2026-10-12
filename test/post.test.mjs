@@ -387,15 +387,20 @@ test('fades mark only the first fitted piece and identify the previous segment, 
   const item = { take: 'demo', transitions: { one: 'fade', two: 'fade', three: 'cut' } };
   const plan = transitionPlan(beats, item, { direction: { fadeSeconds: .4 }, transitions: { color: '#123456' } });
   assert.deepEqual(plan.map((b) => b.fade), [
-    { seconds: .4, from: { color: '#123456' } }, undefined,
-    { seconds: .4, from: { piece: 1, segment: 'one' } }, undefined, undefined,
+    { seconds: .4, offset: 0, from: { color: '#123456' } }, undefined,
+    { seconds: .4, offset: 0, from: { piece: 1, segment: 'one' } }, undefined, undefined,
   ]);
   assert.deepEqual(transitionPlan(beats, item, {}, { take: 'previous', segment: 'last' })[0].fade,
-    { seconds: .5, from: { take: 'previous', segment: 'last' } });
+    { seconds: .5, offset: 0, from: { take: 'previous', segment: 'last' } });
   assert.deepEqual(transitionPlan(beats, item, {})[0].fade.from, { color: '#000000' });
   assert.deepEqual(plan.map(({ fade, ...b }) => b), beats, 'no timestamps shift');
   assert.ok(beats.every((b) => !b.fade), 'planning does not mutate inputs');
-  assert.equal(transitionPlan([{ segment: 'one', start: 0, end: .2 }], item, {})[0].fade.seconds, .2);
+  // A segment opening with a piece shorter than the dissolve carries it into the next pieces,
+  // all fading the same outgoing picture.
+  const short = transitionPlan([{ segment: 'zero', start: 0, end: 1 }, { segment: 'one', start: 1, end: 1.2 },
+    { segment: 'one', start: 1.2, end: 1.35 }, { segment: 'one', start: 1.35, end: 3 }, { segment: 'one', start: 3, end: 4 }], item, {});
+  assert.deepEqual(short.map((b) => b.fade && [b.fade.offset.toFixed(2), b.fade.from.piece]),
+    [undefined, ['0.00', 0], ['0.20', 0], ['0.35', 0], undefined]);
   const log = [[200, '+one'], [1000, 'hold', { beat: 'one' }], [9000, 'holdend'], [9650, '-one'],
     [11000, '+two'], [12000, '-two']];
   const fitted = beat_plan(log, [[0, 'frame.jpg']], { output: { fps: 30 } }, 320, 180,

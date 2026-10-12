@@ -250,7 +250,7 @@ function pixels(c, problems, thresholds) {
     const toOutput = c.cfg.output.height / 540;
     const tooSmall = lines.length > 0 && lines.filter((h0) => h0 * toOutput < thresholds.minTextPx * .7).length > lines.length / 2;
     const hash = `${crop.map((v) => Math.round(v * 10) / 10).join(',')}:${data.toString('base64')}`;
-    const dissolving = c.plan.beats.some((b) => b.fade && s.sec >= b.start && s.sec < b.start + b.fade.seconds);
+    const dissolving = c.plan.beats.some((b) => b.fade && s.sec >= b.start && s.sec < b.start + b.fade.seconds - (b.fade.offset ?? 0));
     if (dissolving) { previousImage = null; previousSec = null; freezeStart = null; }
     else if (hash === previousImage && previousSec !== null && s.sec - previousSec <= 1.1) s.frozenSince = freezeStart;
     else { previousImage = hash; freezeStart = s.sec; }

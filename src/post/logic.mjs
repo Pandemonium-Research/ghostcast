@@ -140,11 +140,22 @@ export function beat_plan(log, frames, cfg, srcW, srcH, { targets = {}, readings
   return { beats: transitionPlan(beats, item, cfg, previous), keys, meta: { duration: Math.round(pos * 1000) / 1000, segments: meta } };
 }
 
+// A dissolve covers the first fadeSeconds of a segment. A segment can open with a piece shorter
+// than that (a short still before sped-up typing), so the dissolve carries on into the next pieces,
+// each starting `offset` seconds into it, all fading out the same outgoing picture.
 export function transitionPlan(beats, item, cfg, previous = null) {
+  const seconds = cfg.direction?.fadeSeconds ?? .5;
+  let carry = null;
   return beats.map((beat, index) => {
-    if ((index && beats[index - 1].segment === beat.segment) || item.transitions?.[beat.segment] !== 'fade') return beat;
-    const from = index ? { piece: index - 1, segment: beats[index - 1].segment }
-      : previous ?? { color: cfg.transitions?.color ?? '#000000' };
-    return { ...beat, fade: { seconds: Math.min(cfg.direction?.fadeSeconds ?? .5, beat.end - beat.start), from } };
+    if (!index || beats[index - 1].segment !== beat.segment) {
+      carry = item.transitions?.[beat.segment] !== 'fade' ? null : {
+        from: index ? { piece: index - 1, segment: beats[index - 1].segment } : previous ?? { color: cfg.transitions?.color ?? '#000000' },
+        elapsed: 0,
+      };
+    }
+    if (!carry || carry.elapsed >= seconds - 1e-6) return beat;
+    const fade = { seconds, offset: carry.elapsed, from: carry.from };
+    carry.elapsed += beat.end - beat.start;
+    return { ...beat, fade };
   });
 }

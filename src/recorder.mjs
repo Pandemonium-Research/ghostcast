@@ -343,6 +343,9 @@ export function makeHelpers(project, page, log, world = null) {
         await page.exposeBinding('__ghostcastTerminalInput', (_, data) => terminalPty?.write(data));
         terminalBindings = true;
       }
+      // setContent keeps the current document's origin and Content Security Policy; after VS Code,
+      // that policy blocks the terminal's own scripts. A blank page carries none.
+      if (page.url() !== 'about:blank') await page.goto('about:blank');
       await page.setContent('<!doctype html><html><head><meta charset="utf-8"></head><body><main id="terminal"></main></body></html>');
       await page.addStyleTag({ path: path.join(XTERM, 'css', 'xterm.css') });
       await page.addStyleTag({ content: `
