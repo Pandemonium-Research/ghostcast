@@ -1,0 +1,63 @@
+{
+  "generated": {
+    "provider": "kokoro",
+    "voice": "af_heart",
+    "storyboardHash": "18d68c4bce9ec5506cb663015471be408837d8c47b1123df7653913cd18516c0"
+  },
+  "pieces": [
+    {
+      "clip": "title.wav",
+      "from": 0,
+      "to": 2.5,
+      "take": "storyboard",
+      "segment": "title",
+      "offset": 0.3,
+      "text": "Feature flags, from your terminal."
+    },
+    {
+      "clip": "flags.wav",
+      "from": 0,
+      "to": 3.575,
+      "take": "storyboard",
+      "segment": "flags",
+      "offset": 0.3,
+      "text": "Your flags live in flags.yaml, right in the repo."
+    },
+    {
+      "clip": "rollout.wav",
+      "from": 0,
+      "to": 6.5,
+      "take": "storyboard",
+      "segment": "rollout",
+      "offset": 0.3,
+      "text": "One command rolls it out to half of your users, in five steps, so a bad change shows up early."
+    },
+    {
+      "clip": "dashboard.wav",
+      "from": 0,
+      "to": 5.125,
+      "take": "storyboard",
+      "segment": "dashboard",
+      "offset": 0.3,
+      "text": "The dashboard picks up the change straight away, with every step in its activity log."
+    },
+    {
+      "clip": "shop.wav",
+      "from": 0,
+      "to": 3.725,
+      "take": "storyboard",
+      "segment": "shop",
+      "offset": 0.3,
+      "text": "And half of your shoppers now get the new express checkout."
+    },
+    {
+      "clip": "made-with.wav",
+      "from": 0,
+      "to": 3.1,
+      "take": "storyboard",
+      "segment": "made-with",
+      "offset": 0.3,
+      "text": "Made with ghostcast, from one storyboard."
+    }
+  ]
+}

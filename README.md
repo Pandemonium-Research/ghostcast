@@ -318,7 +318,10 @@ a case to [`test/vectors/`](test/vectors); when you work around a capture proble
 
 ghostcast builds on [Playwright](https://playwright.dev), [xterm.js](https://xtermjs.org),
 [node-pty](https://github.com/microsoft/node-pty), [ffmpeg](https://ffmpeg.org) and
-[VS Code in the browser](https://code.visualstudio.com/docs/remote/vscode-server).
+[VS Code in the browser](https://code.visualstudio.com/docs/remote/vscode-server). Local speech
+is [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0) through
+[kokoro-js](https://github.com/hexgrad/kokoro), which `ghostcast voice --install` fetches
+separately; it is never bundled with ghostcast.
 
 ## Related tools
 

@@ -17,3 +17,7 @@ To film it, start VS Code for the editor beat (`ghostcast vscode --accept-server
 after reading the VS Code Server license), then run `ghostcast next` here and follow it:
 rehearse, approve, shoot, check, confirm. Shoots run in a disposable copy, so `flags.yaml` here
 never changes.
+
+For a narrated cut, set `audio: kokoro` in `.ghostcast/brief.md` and `provider: kokoro`,
+`voice: af_heart` in `.ghostcast/audio.yaml`, run `ghostcast voice --install` once (about 500 MB),
+then `ghostcast all`. The voice is Kokoro's, a synthetic one; say so wherever the video is shown.

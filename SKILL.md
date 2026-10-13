@@ -186,7 +186,8 @@ The brief's `audio` and `.ghostcast/audio.yaml` say where the voice comes from. 
   then `ghostcast vo-mix` and fix everything under "Problems" in its report.
 
 Generated lines are cached on their text and voice, so changing one line regenerates only that
-line.
+line. A generated voice is synthetic: tell the user to say so where the video is published (for
+example "narration: Kokoro"), and never present it as a person's voice.
 
 ## Rules
 

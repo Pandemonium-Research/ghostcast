@@ -557,8 +557,20 @@ Progress:
   user's key and spends their credits).
 - **The cache** keys clips on provider, voice, model, speed and text: a second run with unchanged
   lines took 0.2 s and loaded no model.
-- **Left:** the recording booth, Whisper alignment of existing clips, a real ElevenLabs run, and
-  a voiced end-to-end shoot.
+- **A voiced cut:** the flagpole demo, re-cut from the same take to Kokoro's lines (no re-shoot),
+  mixed to −16.0 LUFS and checked clean. It found two bugs: the narration check sized beats by
+  word count even when the real clip was there (it now uses the clip), and a generated plan kept
+  timing the cut after audio.yaml switched provider or voice (it now counts only for the voice
+  that spoke it).
+- **Left:** the recording booth, Whisper alignment of existing clips, and a real ElevenLabs run.
+
+Decided:
+
+- **Kokoro stays outside ghostcast's package.** The model and kokoro-js are Apache-2.0, but
+  kokoro-js's phonemizer bundles eSpeak NG, which is GPL-3.0. Installed on demand into the
+  user's data folder and loaded at run time, it does not change ghostcast's MIT licence; bundling
+  it would. Speech it generates is not covered by either licence, so videos can use it freely.
+  The README credits Kokoro, and SKILL.md tells agents to say the voice is synthetic.
 
 Build:
 
