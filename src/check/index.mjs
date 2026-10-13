@@ -161,8 +161,11 @@ function factsChecks(c, problems, thresholds) {
     if (seg) {
       const narr = words(beat.say || '') / (c.cfg.voiceover?.wordsPerSecond || 2.5);
       const placed = c.root && read(path.join(c.root, 'voiceover', 'plan.json'), { pieces: [] }).pieces || [];
-      const voiceDur = placed.filter((p) => p.take === c.take && (p.segment || name) === name).reduce((n, p) => n + Math.max(0, p.to - p.from), 0);
-      if (Math.max(narr, voiceDur) > seg.end - seg.start) problems.push(makeProblem(c.take, 'narration-long', 'error', seg.start, `narration needs ${Math.max(narr, voiceDur).toFixed(1)}s; beat is ${(seg.end - seg.start).toFixed(1)}s`, name, seg.end));
+      const pieces = placed.filter((p) => p.take === c.take && (p.segment || name) === name);
+      // Recorded or generated voice for the beat is the real length; the word count only
+      // estimates it before there is any.
+      const need = pieces.length ? Math.max(...pieces.map((p) => p.offset ?? 0)) + pieces.reduce((n, p) => n + Math.max(0, p.to - p.from), 0) : narr;
+      if (need > seg.end - seg.start) problems.push(makeProblem(c.take, 'narration-long', 'error', seg.start, `narration needs ${need.toFixed(1)}s; beat is ${(seg.end - seg.start).toFixed(1)}s`, name, seg.end));
       const fact = c.log.filter((e) => e[1] === 'facts' && e[0] / 1000 >= (src?.a ?? 0) && e[0] / 1000 <= (src?.b ?? 0)).map((e) => e[2]?.text || '').join(' ');
       for (const phrase of String(beat.say || '').matchAll(/[“"]([^”"]+)[”"]|`([^`]+)`/g)) {
         const quoted = phrase[1] || phrase[2];

@@ -53,10 +53,14 @@ export function voiceCommand(root, audio = readAudio(root)) {
   const status = kokoroStatus(undefined, audio.voice);
   return 'ghostcast voice' + (!status.installed || !status.modelCached || !status.voiceCached ? ' --install' : '');
 }
+// A generated plan counts only for the storyboard and the voice it was spoken from: after audio.yaml
+// switches provider (or to none) or voice, a leftover plan would time the cut to speech it lacks.
 export function generatedPlan(root) {
   try {
     const plan = JSON.parse(fs.readFileSync(path.join(root, 'voiceover', 'plan.json'), 'utf8'));
-    return plan.generated?.storyboardHash === storyboardHash(root) && Array.isArray(plan.pieces) ? plan : null;
+    const audio = readAudio(root);
+    return plan.generated?.storyboardHash === storyboardHash(root) && plan.generated.provider === audio.provider
+      && plan.generated.voice === audio.voice && Array.isArray(plan.pieces) ? plan : null;
   } catch { return null; }
 }
 

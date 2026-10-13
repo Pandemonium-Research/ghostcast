@@ -139,6 +139,15 @@ test('fitTargets uses current generated clips, honors minBeat, and falls back fo
   assert.equal(fitTargets(dir, 'storyboard', []).targets.quiet, 2);
   assert.deepEqual(fitTargets(dir, 'other', []).targets, {});
   const plan = generatedPlan(dir);
+  // Switching audio.yaml to another provider, or to none, leaves the plan behind: it no longer counts.
+  const audioFile = path.join(dir, 'audio.yaml'), audio = fs.readFileSync(audioFile, 'utf8');
+  fs.writeFileSync(audioFile, 'provider: none\n');
+  assert.equal(generatedPlan(dir), null);
+  assert.equal(fitTargets(dir, 'storyboard', []).targets.first, 2);
+  fs.writeFileSync(audioFile, audio.replace(/voice: .*/, 'voice: another_voice'));
+  assert.equal(generatedPlan(dir), null, 'a plan spoken in another voice is stale');
+  fs.writeFileSync(audioFile, audio);
+  assert.equal(fitTargets(dir, 'storyboard', []).targets.first, 4.7);
   json(dir, 'voiceover/plan.json', { ...plan, generated: { ...plan.generated, storyboardHash: 'stale' } });
   assert.equal(fitTargets(dir, 'storyboard', []).targets.first, 2);
   json(dir, 'voiceover/plan.json', { pieces: plan.pieces });

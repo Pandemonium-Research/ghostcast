@@ -75,6 +75,16 @@ test('pure: storyboard checks show visibility, narration duration, copy drift, p
   assert.ok(found.includes('copy-drift')); assert.ok(found.includes('panel-share')); assert.ok(found.includes('cap'));
 });
 
+test('pure: a beat with placed voice is judged by the clip, not by its word count', () => {
+  const say = 'This narration has enough words that two and a half words a second would need far longer than the beat, though the real clip is short.';
+  const storyboard = `video: sample\ncap: 100\nweight: standard\nbeats:\n  - id: alpha\n    surface: web\n    say: '${say}'\n`;
+  const fits = fixture({ story: true, storyboard, voice: [{ clip: 'alpha.wav', from: 0, to: 3, take: 'alpha', segment: 'alpha', offset: .3 }] });
+  assert.ok(!checks(fits).some((p) => p.check === 'narration-long'));
+  const long = fixture({ story: true, storyboard, voice: [{ clip: 'alpha.wav', from: 0, to: 30, take: 'alpha', segment: 'alpha', offset: .3 }] });
+  assert.ok(checks(long).some((p) => p.check === 'narration-long' && /narration needs 30\.3s/.test(p.message)));
+  assert.ok(checks(fixture({ story: true, storyboard })).some((p) => p.check === 'narration-long'), 'without voice, the word count still counts');
+});
+
 test('pure: classic voice placement reports a voice piece past its take', () => {
   const root = fixture({ voice: [{ clip: 'line.wav', from: 0, to: 6, take: 'alpha' }] });
   fs.writeFileSync(path.join(root, 'clips', 'alpha.json'), JSON.stringify({ duration: 1, segments: [{ segment: 'alpha', start: 0, end: 1 }] }));
